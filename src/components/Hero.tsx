@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 
 export default function Hero() {
@@ -44,9 +45,12 @@ export default function Hero() {
         </p>
 
         <div className="flex gap-3 items-center">
-          <button className="px-6 py-2.5 rounded-full bg-linear-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 transition-all duration-200">
+          <Link
+            href="/login"
+            className="px-6 py-2.5 rounded-full bg-linear-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold shadow-lg shadow-violet-200 hover:shadow-violet-300 hover:-translate-y-0.5 transition-all duration-200"
+          >
             Get Started
-          </button>
+          </Link>
         </div>
 
         {/* Stats row */}
