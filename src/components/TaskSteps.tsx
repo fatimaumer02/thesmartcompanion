@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = {
@@ -14,7 +15,9 @@ type Step = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const UNLOCK_AFTER_MS = 15 * 60 * 1000 // 15 minutes
 
-const INITIAL_STEPS: Step[] = [
+const FALLBACK_TITLE = "Clean my room"
+
+const FALLBACK_STEPS: Step[] = [
   { id: 1, text: "Pick up clothes from the floor", duration: "5 min", completed: false, startedAt: null },
   { id: 2, text: "Put clothes in laundry basket",  duration: "3 min", completed: false, startedAt: null },
   { id: 3, text: "Arrange books on the table",     duration: "7 min", completed: false, startedAt: null },
@@ -22,6 +25,35 @@ const INITIAL_STEPS: Step[] = [
   { id: 5, text: "Organize items in the drawers",  duration: "10 min", completed: false, startedAt: null },
   { id: 6, text: "Sweep the floor",                duration: "5 min", completed: false, startedAt: null },
 ]
+
+function loadFromSession(): { title: string; steps: Step[] } {
+  if (typeof window === "undefined") {
+    return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+  }
+  try {
+    const raw = window.sessionStorage.getItem("currentTask")
+    if (!raw) return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+    const parsed = JSON.parse(raw) as {
+      title?: string
+      steps?: { text: string; duration: string }[]
+    }
+    if (!parsed.steps?.length || !parsed.title) {
+      return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+    }
+    return {
+      title: parsed.title,
+      steps: parsed.steps.map((s, i) => ({
+        id: i + 1,
+        text: s.text,
+        duration: s.duration,
+        completed: false,
+        startedAt: null,
+      })),
+    }
+  } catch {
+    return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtTime(secs: number) {
@@ -33,7 +65,7 @@ function fmtTime(secs: number) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center rounded-3xl bg-blue-950/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/60 backdrop-blur-sm p-4 overflow-y-auto">
       {children}
     </div>
   )
@@ -41,7 +73,7 @@ function Overlay({ children }: { children: React.ReactNode }) {
 
 function Modal({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-xs bg-white rounded-2xl shadow-2xl shadow-blue-900/30 overflow-hidden">
+    <div className="w-full max-w-sm sm:max-w-md bg-white rounded-2xl shadow-2xl shadow-blue-900/30 overflow-hidden my-auto">
       {children}
     </div>
   )
@@ -49,7 +81,9 @@ function Modal({ children }: { children: React.ReactNode }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TaskSteps() {
-  const [steps, setSteps] = useState<Step[]>(INITIAL_STEPS)
+  const router = useRouter()
+  const [{ title, steps: initialSteps }] = useState(loadFromSession)
+  const [steps, setSteps] = useState<Step[]>(initialSteps)
   const [activeStep, setActiveStep] = useState<number | null>(null)
   const [firstCompletedAt, setFirstCompletedAt] = useState<number | null>(null)
   const [unlocked, setUnlocked] = useState(false)
@@ -130,7 +164,7 @@ export default function TaskSteps() {
   const activeStepObj = steps.find((s) => s.id === activeStep)
   const progressMsg =
     progressPct === 100
-      ? `Your room is spotless! All ${steps.length} steps complete.`
+      ? `Nicely done! All ${steps.length} steps complete.`
       : activeStepObj
       ? `${completedCount}/${steps.length} done. Working on: "${activeStepObj.text}"`
       : completedCount === 0
@@ -143,25 +177,26 @@ export default function TaskSteps() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-start justify-center py-8 px-4">
-      <div className="relative w-full max-w-sm bg-blue-50 rounded-3xl overflow-hidden shadow-xl shadow-blue-200/60">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-start justify-center py-8 px-4 sm:px-6 lg:px-8">
+      <div className="relative w-full max-w-6xl bg-blue-50 rounded-3xl overflow-hidden shadow-xl shadow-blue-200/60">
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
-        <div className="bg-white px-5 pt-5 pb-4 border-b border-blue-100">
+        <div className="bg-white px-5 sm:px-8 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-blue-100">
           {/* breadcrumb */}
           <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-widest mb-1">
-            6. Task Breakdown (Steps List)
+            Task Breakdown
           </p>
           <div className="flex items-center gap-3">
             {/* back arrow */}
             <button
+              onClick={() => router.push("/mytask")}
               className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-base transition-colors"
               aria-label="Back"
             >
               ←
             </button>
 
-            <h1 className="flex-1 text-[17px] font-bold text-blue-950">Clean my room</h1>
+            <h1 className="flex-1 text-[17px] sm:text-xl lg:text-2xl font-bold text-blue-950">{title}</h1>
 
             {/* unlock badge */}
             {firstCompletedAt && !unlocked && timeLeft !== null && (
@@ -182,7 +217,7 @@ export default function TaskSteps() {
         </div>
 
         {/* ── Progress bar ──────────────────────────────────────────────────── */}
-        <div className="px-5 pt-3 pb-1">
+        <div className="px-5 sm:px-8 pt-3 sm:pt-4 pb-1">
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[11px] font-medium text-blue-400">Progress</span>
             <span className="text-[11px] font-bold text-blue-600">{progressPct}%</span>
@@ -197,7 +232,7 @@ export default function TaskSteps() {
 
         {/* ── Unlock banner ─────────────────────────────────────────────────── */}
         {firstCompletedAt && !unlocked && timeLeft !== null && (
-          <div className="mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+          <div className="mx-4 sm:mx-8 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
             <span className="text-xl">⏱️</span>
             <div>
               <p className="text-[12px] font-bold text-amber-700">
@@ -209,7 +244,7 @@ export default function TaskSteps() {
         )}
 
         {unlocked && completedCount > 0 && !steps.every((s) => s.completed) && (
-          <div className="mx-4 mt-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+          <div className="mx-4 sm:mx-8 mt-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
             <span className="text-xl">🎯</span>
             <p className="text-[12px] font-bold text-emerald-700">
               Multi-task unlocked! Work on 2 tasks simultaneously.
@@ -218,7 +253,7 @@ export default function TaskSteps() {
         )}
 
         {/* ── Steps list ────────────────────────────────────────────────────── */}
-        <div className="px-4 pt-3 pb-2 flex flex-col gap-2.5">
+        <div className="px-4 sm:px-8 pt-3 sm:pt-5 pb-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
           {steps.map((step, i) => {
             const isActive = activeStep === step.id
             const isCompleted = step.completed
@@ -292,7 +327,7 @@ export default function TaskSteps() {
         </div>
 
         {/* ── View Progress button ───────────────────────────────────────────── */}
-        <div className="px-4 pt-2 pb-6">
+        <div className="px-4 sm:px-8 pt-3 sm:pt-5 pb-6 sm:pb-8 max-w-md mx-auto w-full">
           <button
             onClick={() => canViewProgress && setShowProgress(true)}
             className={[

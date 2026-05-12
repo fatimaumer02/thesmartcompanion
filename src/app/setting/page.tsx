@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Sidebar from "../../components/Sidebar"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Theme = "Light" | "Dark" | "Auto"
+import {
+  applyFont,
+  applyTheme,
+  type Theme,
+} from "../../components/AppearanceBootstrap"
 
 // ─── Toggle Switch Component ──────────────────────────────────────────────────
 function Toggle({
@@ -47,9 +49,10 @@ const FONTS = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const [theme, setTheme] = useState<Theme>("Light")
-  const [fontStyle, setFontStyle] = useState("OpenDyslexic")
+  const [theme, setThemeState] = useState<Theme>("Light")
+  const [fontStyle, setFontStyleState] = useState("System Default")
   const [fontDropOpen, setFontDropOpen] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
 
   const [highContrast, setHighContrast] = useState(true)
   const [reduceAnim, setReduceAnim] = useState(false)
@@ -58,6 +61,41 @@ export default function SettingsPage() {
   const [notifEmail, setNotifEmail] = useState(true)
   const [notifPush, setNotifPush] = useState(false)
   const [notifSMS, setNotifSMS] = useState(false)
+
+  // Hydrate from localStorage on first render
+  useEffect(() => {
+    try {
+      const storedTheme = localStorage.getItem("appearance.theme") as Theme | null
+      const storedFont = localStorage.getItem("appearance.font")
+      if (storedTheme) setThemeState(storedTheme)
+      if (storedFont) setFontStyleState(storedFont)
+    } catch {
+      // localStorage unavailable
+    }
+  }, [])
+
+  const setTheme = (next: Theme) => {
+    setThemeState(next)
+    try {
+      localStorage.setItem("appearance.theme", next)
+    } catch {}
+    applyTheme(next)
+  }
+
+  const setFontStyle = (next: string) => {
+    setFontStyleState(next)
+    try {
+      localStorage.setItem("appearance.font", next)
+    } catch {}
+    applyFont(next)
+  }
+
+  const handleSave = () => {
+    // Settings already persist as the user toggles them; this button gives
+    // visible confirmation and is a hook for future server-side sync.
+    setSavedAt(Date.now())
+    window.setTimeout(() => setSavedAt(null), 2500)
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans">
@@ -201,10 +239,18 @@ export default function SettingsPage() {
         </Section>
 
         {/* Save Button */}
-        <div className="mt-6">
-          <button className="bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-3 rounded-xl shadow-lg shadow-blue-200 text-sm transition-all duration-200 active:scale-95">
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            className="bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-3 rounded-xl shadow-lg shadow-blue-200 text-sm transition-all duration-200 active:scale-95"
+          >
             Save Changes
           </button>
+          {savedAt && (
+            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5">
+              ✓ Saved
+            </span>
+          )}
         </div>
       </main>
     </div>

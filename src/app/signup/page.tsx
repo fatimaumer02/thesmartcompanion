@@ -1,9 +1,28 @@
 "use client";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+
+  const handleCreateAccount = () => {
+    const trimmedName = name.trim();
+    if (trimmedName) {
+      try {
+        localStorage.setItem(
+          "userProfile",
+          JSON.stringify({ name: trimmedName, email: email.trim() }),
+        );
+      } catch {
+        // localStorage unavailable
+      }
+    }
+    router.push("/login");
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <div className="bg-white rounded-2xl shadow-lg flex w-full max-w-4xl overflow-hidden">
@@ -21,6 +40,8 @@ export default function SignupPage() {
               <input
                 type="text"
                 placeholder="Enter your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
@@ -30,6 +51,8 @@ export default function SignupPage() {
               <input
                 type="email"
                 placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
@@ -62,10 +85,10 @@ export default function SignupPage() {
               </span>
             </div>
 
-            <button onClick={() => router.push("/login")}
+            <button
+              onClick={handleCreateAccount}
               type="button"
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
-              
             >
               Create Account
             </button>

@@ -1,10 +1,10 @@
 export default function ProgressCard() {
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm">
 
-      <div className="flex justify-between mb-2">
+      <div className="flex justify-between items-center mb-2 gap-3">
         <span className="text-sm text-gray-600">
-          Today's Progress
+          Today&apos;s Progress
         </span>
 
         <span className="text-sm font-medium">
