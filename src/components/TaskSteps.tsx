@@ -13,6 +13,12 @@ type Step = {
   startedAt: number | null
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+// If a step is completed in under this threshold, we treat it as a "quick win"
+// and skip the cooldown entirely — the user didn't actually spend the
+// estimated duration on it, so no need to throttle the next step.
+const QUICK_COMPLETE_MS = 10_000
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseDurationMs(duration: string): number {
   const hrs  = duration.match(/(\d+)\s*h/i)
@@ -204,13 +210,17 @@ export default function TaskSteps() {
       }
 
       if (activeStep === id) {
+        const elapsed = step.startedAt ? Date.now() - step.startedAt : 0
         const updatedSteps = steps.map((s) =>
           s.id === id ? { ...s, completed: true } : s
         )
         setSteps(updatedSteps)
         setActiveStep(null)
         updateLocalStorageProgress(updatedSteps)
-        if (completedCount === 0) {
+        // Only start the cooldown if this is the first real completion AND the
+        // user actually spent meaningful time on it. Steps finished in <10s
+        // are "quick wins" — let them keep moving without throttle.
+        if (completedCount === 0 && elapsed >= QUICK_COMPLETE_MS) {
           setFirstCompletedAt(Date.now())
           setCompletedStepDurationMs(parseDurationMs(step.duration))
         }
@@ -222,11 +232,13 @@ export default function TaskSteps() {
         return
       }
 
-      if (completedCount >= 1 && !unlocked) {
+      // Block only if a cooldown is actually running. If firstCompletedAt is
+      // null, the previous completion was a quick win and didn't trigger one.
+      if (completedCount >= 1 && !unlocked && firstCompletedAt !== null) {
         setAlertMsg(
           timeLeft !== null
             ? `You can start a second task in ${fmtTime(timeLeft)}. Complete your current step first!`
-            : "Please wait for the 15-minute timer to expire."
+            : "Please wait for the cooldown to expire."
         )
         return
       }
@@ -234,7 +246,7 @@ export default function TaskSteps() {
       setActiveStep(id)
       setSteps((p) => p.map((s) => (s.id === id ? { ...s, startedAt: Date.now() } : s)))
     },
-    [steps, activeStep, completedCount, unlocked, timeLeft, completedStepDurationMs, updateLocalStorageProgress]
+    [steps, activeStep, completedCount, unlocked, timeLeft, completedStepDurationMs, firstCompletedAt, updateLocalStorageProgress]
   )
 
   const progressIcon = progressPct === 100 ? "🎉" : progressPct >= 50 ? "💪" : "🚀"
