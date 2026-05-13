@@ -86,12 +86,16 @@ export default function MyTasksPage() {
         return
       }
 
-      const newTaskObj = saveTask(data.title, data.steps.length)
+      const newTaskObj = saveTask(data.title, data.steps.length, data.steps)
       setTasks((prev) => [...prev, newTaskObj])
 
       sessionStorage.setItem(
         "currentTask",
-        JSON.stringify({ title: data.title, steps: data.steps }),
+        JSON.stringify({
+          title: data.title,
+          steps: data.steps,
+          taskId: newTaskObj.id,
+        }),
       )
       router.push("/taskinfo")
     } catch (e) {
@@ -218,7 +222,7 @@ export default function MyTasksPage() {
               </div>
               <div className="flex flex-col gap-3.5">
                 {sortedTasks.map((task, i) => (
-                  <TaskCard key={task.id} title={task.title} progress={task.progress} index={i} />
+                  <TaskCard key={task.id} title={task.title} progress={task.progress} index={i} taskId={task.id} />
                 ))}
               </div>
             </>
