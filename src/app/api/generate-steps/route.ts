@@ -1,5 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Provider is auto-selected based on which key is in the environment.
+// Groq is preferred (faster + free tier); OpenAI is the fallback so the route
+// works without anyone reconfiguring keys.
+type ProviderConfig = {
+  name: "groq" | "openai";
+  url: string;
+  apiKey: string;
+  model: string;
+};
+
+function pickProvider(): ProviderConfig | null {
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  if (groqKey) {
+    return {
+      name: "groq",
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: groqKey,
+      model: "llama-3.3-70b-versatile",
+    };
+  }
+  const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  if (openaiKey) {
+    return {
+      name: "openai",
+      url: "https://api.openai.com/v1/chat/completions",
+      apiKey: openaiKey,
+      model: "gpt-4o-mini",
+    };
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -13,9 +45,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Task title is required." }, { status: 400 });
     }
 
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    if (!GROQ_API_KEY) {
-      return NextResponse.json({ error: "API key not configured." }, { status: 500 });
+    const provider = pickProvider();
+    if (!provider) {
+      return NextResponse.json(
+        { error: "API key not configured. Set GROQ_API_KEY or OPENAI_API_KEY in .env.local." },
+        { status: 500 },
+      );
     }
 
     const neuroContext = neurotype?.length
@@ -40,49 +75,64 @@ Always respond with ONLY valid JSON in this exact format — no extra text, no m
   ]
 }`;
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const response = await fetch(provider.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${provider.apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: provider.model,
         max_tokens: 1024,
         messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: `Break this task into steps: "${title.trim()}"`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Break this task into steps: "${title.trim()}"` },
         ],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Groq API error:", errText);
-      return NextResponse.json(
-        { error: "Failed to generate steps. Please try again." },
-        { status: 502 }
-      );
+      console.error(`${provider.name} API error (status ${response.status}):`, errText);
+
+      // Map common upstream errors to user-facing messages.
+      let userMessage: string;
+      if (response.status === 401) {
+        userMessage = `Invalid ${provider.name.toUpperCase()} API key. Check .env.local.`;
+      } else if (response.status === 402 || /quota|insufficient|billing/i.test(errText)) {
+        userMessage = `${provider.name.toUpperCase()} quota exceeded. Add credits or switch providers.`;
+      } else if (response.status === 429) {
+        userMessage = "Rate limit hit. Wait a moment and try again.";
+      } else if (response.status === 404 || /model.*not.*found/i.test(errText)) {
+        userMessage = `${provider.name.toUpperCase()} doesn't recognize the model. Check the route config.`;
+      } else {
+        // Pull the upstream error.message if possible, otherwise show status.
+        let detail = `HTTP ${response.status}`;
+        try {
+          const parsed = JSON.parse(errText) as { error?: { message?: string } | string };
+          if (typeof parsed.error === "string") detail = parsed.error;
+          else if (parsed.error?.message) detail = parsed.error.message;
+        } catch {
+          /* keep status code fallback */
+        }
+        userMessage = `${provider.name.toUpperCase()} error: ${detail.slice(0, 200)}`;
+      }
+
+      return NextResponse.json({ error: userMessage }, { status: 502 });
     }
 
-    const groqData = await response.json();
-    const rawText = groqData?.choices?.[0]?.message?.content ?? "";
+    const data = await response.json();
+    const rawText = data?.choices?.[0]?.message?.content ?? "";
 
     let parsed: { title: string; steps: { text: string; duration: string }[] };
     try {
       const clean = rawText.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
-      console.error("Failed to parse Groq response:", rawText);
+      console.error(`Failed to parse ${provider.name} response:`, rawText);
       return NextResponse.json(
         { error: "Couldn't generate steps right now. Please try again." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -91,7 +141,7 @@ Always respond with ONLY valid JSON in this exact format — no extra text, no m
     console.error("Unexpected error:", err);
     return NextResponse.json(
       { error: "An unexpected error occurred." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

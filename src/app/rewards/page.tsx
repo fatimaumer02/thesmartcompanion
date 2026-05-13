@@ -1,84 +1,155 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import { readTasks, type Task } from "../../lib/task";
 
-const achievements = [
-  { value: "12", label: "Tasks Completed", color: "#2563eb" },
-  { value: "5",  label: "Day Streak 🔥",   color: "#f59e0b" },
-  { value: "3",  label: "Badges Earned",   color: "#f59e0b" },
-];
+// ─── Badges ───────────────────────────────────────────────────────────────────
+type Stats = {
+  tasksCompleted: number;
+  totalSteps: number;
+  streak: number;
+};
 
-const badges = [
+type Badge = {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  // Color rings — matches the playful badge look from the original page.
+  outerRing: string;
+  midRing: string;
+  innerBg: string;
+  earned: (s: Stats) => boolean;
+};
+
+const BADGES: Badge[] = [
   {
-    id: 1,
+    id: "first-win",
     name: "First Win",
     desc: "Complete your first task",
-    outerRing: "#fde68a",
-    midRing:   "#fbbf24",
-    innerBg:   "#d97706",
     icon: "⭐",
-    earned: true,
+    outerRing: "#fde68a",
+    midRing: "#fbbf24",
+    innerBg: "#d97706",
+    earned: (s) => s.tasksCompleted >= 1,
   },
   {
-    id: 2,
-    name: "3 Day Streak",
-    desc: "Complete tasks 3 days in a row",
-    outerRing: "#bae6fd",
-    midRing:   "#38bdf8",
-    innerBg:   "#0284c7",
+    id: "three-day-streak",
+    name: "3-Day Streak",
+    desc: "Active 3 days in a row",
     icon: "💧",
-    earned: true,
+    outerRing: "#bae6fd",
+    midRing: "#38bdf8",
+    innerBg: "#0284c7",
+    earned: (s) => s.streak >= 3,
   },
   {
-    id: 3,
+    id: "focus-master",
     name: "Focus Master",
-    desc: "Complete 10 tasks in focus mode",
-    outerRing: "#c7d2fe",
-    midRing:   "#6366f1",
-    innerBg:   "#1e1b5e",
+    desc: "Complete 10 tasks",
     icon: "🎯",
-    earned: true,
+    outerRing: "#c7d2fe",
+    midRing: "#6366f1",
+    innerBg: "#1e1b5e",
+    earned: (s) => s.tasksCompleted >= 10,
   },
   {
-    id: 4,
-    name: "More",
-    desc: "Coming Soon",
-    outerRing: "#f3f4f6",
-    midRing:   "#e5e7eb",
-    innerBg:   "#d1d5db",
-    icon: null,
-    earned: false,
+    id: "step-hero",
+    name: "Step Hero",
+    desc: "Complete 50 steps",
+    icon: "👟",
+    outerRing: "#fbcfe8",
+    midRing: "#ec4899",
+    innerBg: "#9d174d",
+    earned: (s) => s.totalSteps >= 50,
+  },
+  {
+    id: "week-warrior",
+    name: "Week Warrior",
+    desc: "7-day streak",
+    icon: "🔥",
+    outerRing: "#fed7aa",
+    midRing: "#fb923c",
+    innerBg: "#9a3412",
+    earned: (s) => s.streak >= 7,
+  },
+  {
+    id: "centurion",
+    name: "Centurion",
+    desc: "Complete 100 steps",
+    icon: "💯",
+    outerRing: "#bbf7d0",
+    midRing: "#22c55e",
+    innerBg: "#14532d",
+    earned: (s) => s.totalSteps >= 100,
   },
 ];
 
-const recentActivity = [
-  { text: 'Completed "Clean my room"', xp: "+10 XP" },
-  { text: 'Completed "Read 20 pages"', xp: "+15 XP" },
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function parseProgress(progress: string): { done: number; total: number } {
+  const [d, t] = progress.split("/").map(Number);
+  return { done: Number.isFinite(d) ? d : 0, total: Number.isFinite(t) ? t : 0 };
+}
 
-function CircleBadge({ badge }: { badge: { id: number; name: string; desc: string; outerRing: string; midRing: string; innerBg: string; icon: string | null; earned: boolean; } }) {
+function dayKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function computeStats(tasks: Task[]): Stats {
+  let tasksCompleted = 0;
+  let totalSteps = 0;
+  const activeDays = new Set<string>();
+
+  for (const t of tasks) {
+    const { done, total } = parseProgress(t.progress);
+    totalSteps += done;
+    if (total > 0 && done === total) tasksCompleted += 1;
+    activeDays.add(dayKey(t.id));
+  }
+
+  // Streak: consecutive calendar days ending today with task activity.
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (activeDays.has(key)) streak += 1;
+    else break;
+  }
+
+  return { tasksCompleted, totalSteps, streak };
+}
+
+// ─── Components ───────────────────────────────────────────────────────────────
+function CircleBadge({ badge, earned }: { badge: Badge; earned: boolean }) {
   const SIZE = 88;
   const cx = SIZE / 2;
   const outerR = cx;
-  const midR   = outerR - 8;
+  const midR = outerR - 8;
   const innerR = midR - 9;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: 110, opacity: badge.earned ? 1 : 0.5 }}>
+    <div
+      className={`flex flex-col items-center gap-2.5 transition-all duration-200 ${
+        earned ? "" : "opacity-50"
+      }`}
+    >
       <div
-        style={{ position: "relative", width: SIZE, height: SIZE, cursor: badge.earned ? "pointer" : "default", transition: "transform 0.22s cubic-bezier(.34,1.56,.64,1)" }}
-        onMouseEnter={e => { if (badge.earned) e.currentTarget.style.transform = "scale(1.1)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+        className={`relative ${earned ? "hover:scale-110" : ""}`}
+        style={{
+          width: SIZE,
+          height: SIZE,
+          transition: "transform 0.22s cubic-bezier(.34,1.56,.64,1)",
+        }}
       >
-        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ display: "block" }}>
-          {/* Outer pale ring */}
-          <circle cx={cx} cy={cx} r={outerR} fill={badge.outerRing} />
-          {/* Mid ring */}
-          <circle cx={cx} cy={cx} r={midR} fill={badge.midRing} />
-          {/* Inner dark circle */}
-          <circle cx={cx} cy={cx} r={innerR} fill={badge.innerBg} />
-          {/* Shine arc */}
-          {badge.earned && (
+        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="block">
+          <circle cx={cx} cy={cx} r={outerR} fill={earned ? badge.outerRing : "#f3f4f6"} />
+          <circle cx={cx} cy={cx} r={midR} fill={earned ? badge.midRing : "#e5e7eb"} />
+          <circle cx={cx} cy={cx} r={innerR} fill={earned ? badge.innerBg : "#d1d5db"} />
+          {earned && (
             <path
               d={`M ${cx - innerR * 0.5} ${cx - innerR * 0.55} A ${innerR * 0.65} ${innerR * 0.65} 0 0 1 ${cx + innerR * 0.35} ${cx - innerR * 0.65}`}
               stroke="rgba(255,255,255,0.28)"
@@ -87,110 +158,189 @@ function CircleBadge({ badge }: { badge: { id: number; name: string; desc: strin
               strokeLinecap="round"
             />
           )}
-          {/* Lock for uneearned */}
-          {!badge.earned && (
+          {!earned && (
             <>
               <rect x={cx - 7} y={cx - 1} width="14" height="10" rx="2" fill="#9ca3af" />
-              <path d={`M ${cx - 4} ${cx - 1} V ${cx - 5} a4 4 0 0 1 8 0 V ${cx - 1}`} stroke="#9ca3af" strokeWidth="2" fill="none" strokeLinecap="round" />
+              <path
+                d={`M ${cx - 4} ${cx - 1} V ${cx - 5} a4 4 0 0 1 8 0 V ${cx - 1}`}
+                stroke="#9ca3af"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
             </>
           )}
         </svg>
-
-        {/* Emoji overlaid */}
-        {badge.earned && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, lineHeight: 1 }}>
+        {earned && (
+          <div className="absolute inset-0 flex items-center justify-center text-3xl leading-none">
             {badge.icon}
           </div>
         )}
       </div>
-
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", marginBottom: 3 }}>{badge.name}</div>
-        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, lineHeight: 1.45 }}>{badge.desc}</div>
+      <div className="text-center">
+        <div className="text-[13px] font-extrabold text-slate-900">{badge.name}</div>
+        <div className="text-[11px] text-slate-500 font-medium leading-snug max-w-[120px]">
+          {badge.desc}
+        </div>
       </div>
     </div>
   );
 }
 
-export default function RewardsPage() {
+function StatCard({
+  value,
+  label,
+  color,
+}: {
+  value: number;
+  label: string;
+  color: string;
+}) {
   return (
-    <div className="flex">
+    <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-4 py-5 sm:py-6 text-center hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
+      <div className={`text-3xl sm:text-4xl font-black leading-none mb-1.5 ${color}`}>
+        {value}
+      </div>
+      <div className="text-xs text-slate-500 font-bold">{label}</div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function RewardsPage() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    // Hydrate after mount so SSR + client markup match.
+    setTasks(readTasks());
+
+    // Cross-tab updates: if the user completes a step in another tab, the
+    // "userTasks" storage event lets us refresh.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "userTasks") setTasks(readTasks());
+    };
+    // Visibility: when the user navigates back to this tab from /taskinfo, refresh.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setTasks(readTasks());
+    };
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  const stats = useMemo(() => computeStats(tasks), [tasks]);
+  const badgesEarned = useMemo(
+    () => BADGES.filter((b) => b.earned(stats)).length,
+    [stats],
+  );
+  const recentCompleted = useMemo(
+    () =>
+      tasks
+        .filter((t) => {
+          const { done, total } = parseProgress(t.progress);
+          return total > 0 && done === total;
+        })
+        .slice(-5)
+        .reverse(),
+    [tasks],
+  );
+
+  return (
+    <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
 
-      <div
-        style={{
-          flex: 1,
-          marginLeft: "256px",
-          minHeight: "100vh",
-          background: "#f0f6ff",
-          fontFamily: "'Nunito', sans-serif",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          padding: "48px 24px",
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 680 }}>
+      <main className="flex-1 min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-50 lg:ml-64 px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="max-w-4xl mx-auto">
 
-          <h1 style={{ fontSize: 28, fontWeight: 900, color: "#1e3a8a", marginBottom: 32, letterSpacing: "-0.5px" }}>
-            🏆 Rewards
+          <h1 className="text-2xl sm:text-3xl font-black text-blue-900 tracking-tight mb-8 flex items-center gap-2">
+            <span>🏆</span> Rewards
           </h1>
 
-          {/* Achievements */}
-          <section style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {/* ── Stats ─────────────────────────────────────────── */}
+          <section className="mb-10">
+            <h2 className="text-xs sm:text-sm font-extrabold text-blue-700 uppercase tracking-widest mb-4">
               Your Achievements
             </h2>
-            <div style={{ display: "flex", gap: 14 }}>
-              {achievements.map((a) => (
-                <div
-                  key={a.label}
-                  style={{ flex: 1, background: "#fff", borderRadius: 16, padding: "22px 16px", textAlign: "center", boxShadow: "0 2px 12px rgba(59,130,246,0.10)", border: "1.5px solid #bfdbfe", transition: "transform 0.18s, box-shadow 0.18s" }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(59,130,246,0.18)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(59,130,246,0.10)"; }}
-                >
-                  <div style={{ fontSize: 38, fontWeight: 900, color: a.color, lineHeight: 1, marginBottom: 6 }}>{a.value}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{a.label}</div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <StatCard
+                value={stats.tasksCompleted}
+                label="Tasks Completed"
+                color="text-blue-600"
+              />
+              <StatCard
+                value={stats.streak}
+                label="Day Streak 🔥"
+                color="text-amber-500"
+              />
+              <StatCard
+                value={badgesEarned}
+                label={`of ${BADGES.length} Badges Earned`}
+                color="text-amber-500"
+              />
             </div>
           </section>
 
-          {/* Badges */}
-          <section style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {/* ── Badges ────────────────────────────────────────── */}
+          <section className="mb-10">
+            <h2 className="text-xs sm:text-sm font-extrabold text-blue-700 uppercase tracking-widest mb-4">
               Badges
             </h2>
-            <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #bfdbfe", boxShadow: "0 2px 12px rgba(59,130,246,0.08)", padding: "32px 24px", display: "flex", justifyContent: "space-around", alignItems: "flex-start" }}>
-              {badges.map((badge) => <CircleBadge key={badge.id} badge={badge} />)}
+            <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 sm:p-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 sm:gap-8 justify-items-center">
+                {BADGES.map((badge) => (
+                  <CircleBadge
+                    key={badge.id}
+                    badge={badge}
+                    earned={badge.earned(stats)}
+                  />
+                ))}
+              </div>
             </div>
           </section>
 
-          {/* Recent Activity */}
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {/* ── Recent Activity ───────────────────────────────── */}
+          <section className="pb-8">
+            <h2 className="text-xs sm:text-sm font-extrabold text-blue-700 uppercase tracking-widest mb-4">
               Recent Activity
             </h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {recentActivity.map((item, i) => (
-                <div
-                  key={i}
-                  style={{ background: "#fff", borderRadius: 14, padding: "15px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", border: "1.5px solid #bfdbfe", boxShadow: "0 1px 6px rgba(59,130,246,0.07)", transition: "box-shadow 0.18s" }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(59,130,246,0.14)")}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 1px 6px rgba(59,130,246,0.07)")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#3b82f6,#1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 800, flexShrink: 0 }}>✓</div>
-                    <span style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{item.text}</span>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#2563eb", background: "#dbeafe", padding: "4px 13px", borderRadius: 20, whiteSpace: "nowrap" }}>{item.xp}</span>
-                </div>
-              ))}
-            </div>
+            {recentCompleted.length > 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {recentCompleted.map((task) => {
+                  const { total } = parseProgress(task.progress);
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white rounded-xl border border-blue-100 shadow-sm px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          ✓
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 truncate">
+                          Completed &quot;{task.title}&quot;
+                        </span>
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        +{total * 5} XP
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-blue-100 shadow-sm px-5 py-8 text-center">
+                <p className="text-sm text-slate-500">
+                  No completed tasks yet — finish your first to start earning badges.
+                </p>
+              </div>
+            )}
           </section>
 
         </div>
-      </div>
+      </main>
     </div>
   );
 }
