@@ -197,11 +197,19 @@ export default function TaskSteps() {
 
   const handleTap = useCallback(
     (id: number) => {
-      const step = steps.find((s) => s.id === id)!
+      const stepIndex = steps.findIndex((s) => s.id === id)
+      const step = steps[stepIndex]
+      if (!step) return
 
       if (step.completed) {
-        const updatedSteps = steps.map((s) =>
-          s.id === id ? { ...s, completed: false, startedAt: null } : s
+        // Cascade-uncheck: un-completing a step also un-completes every later
+        // completed step. Otherwise we'd end up in an "out of order" state
+        // (e.g. step 1 not done but step 2 done), which violates the
+        // sequential constraint enforced below.
+        const updatedSteps = steps.map((s, i) =>
+          i >= stepIndex && s.completed
+            ? { ...s, completed: false, startedAt: null }
+            : s
         )
         setSteps(updatedSteps)
         updateLocalStorageProgress(updatedSteps)
@@ -229,6 +237,16 @@ export default function TaskSteps() {
 
       if (activeStep !== null) {
         setAlertMsg("Finish or uncheck your current active step before starting a new one.")
+        return
+      }
+
+      // Sequential order: you can only start the next-up step. The first
+      // incomplete step in the list is the only one allowed to activate.
+      const firstIncompleteIndex = steps.findIndex((s) => !s.completed)
+      if (firstIncompleteIndex !== -1 && stepIndex !== firstIncompleteIndex) {
+        setAlertMsg(
+          `Please complete step ${firstIncompleteIndex + 1} first. Steps must be done in order.`,
+        )
         return
       }
 
@@ -352,8 +370,12 @@ export default function TaskSteps() {
           {steps.map((step, i) => {
             const isActive = activeStep === step.id
             const isCompleted = step.completed
+            const firstIncompleteIndex = steps.findIndex((s) => !s.completed)
+            const isSequenceLocked =
+              !isCompleted && !isActive && firstIncompleteIndex !== -1 && i !== firstIncompleteIndex
             const isLocked =
-              !isActive && !isCompleted && completedCount >= 1 && !unlocked && activeStep !== null
+              isSequenceLocked ||
+              (!isActive && !isCompleted && completedCount >= 1 && !unlocked && activeStep !== null)
 
             return (
               <button
@@ -536,10 +558,15 @@ export default function TaskSteps() {
 
               <div className="px-4 pb-5">
                 <button
-                  onClick={() => setShowProgress(false)}
+                  onClick={() => {
+                    setShowProgress(false)
+                    // When the task is fully done, take the user back to the
+                    // dashboard instead of leaving them on a completed task page.
+                    if (progressPct === 100) router.push("/dashboard")
+                  }}
                   className="w-full bg-linear-to-r from-blue-600 to-indigo-600 text-white font-bold py-3.5 rounded-xl text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md shadow-blue-200"
                 >
-                  Close
+                  {progressPct === 100 ? "Back to Dashboard" : "Close"}
                 </button>
               </div>
             </Modal>
