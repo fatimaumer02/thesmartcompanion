@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { updateTaskProgress } from "../lib/task"  // ← ADD this import
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = {
@@ -12,50 +13,57 @@ type Step = {
   startedAt: number | null
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const UNLOCK_AFTER_MS = 15 * 60 * 1000 // 15 minutes
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function parseDurationMs(duration: string): number {
+  const hrs  = duration.match(/(\d+)\s*h/i)
+  const mins = duration.match(/(\d+)\s*m/i)
+  const h = hrs  ? parseInt(hrs[1],  10) : 0
+  const m = mins ? parseInt(mins[1], 10) : 0
+  const total = (h * 60 + m) * 60 * 1000
+  return total > 0 ? total : 15 * 60 * 1000
+}
 
-const FALLBACK_TITLE = "Clean my room"
-
-const FALLBACK_STEPS: Step[] = [
-  { id: 1, text: "Pick up clothes from the floor", duration: "5 min", completed: false, startedAt: null },
-  { id: 2, text: "Put clothes in laundry basket",  duration: "3 min", completed: false, startedAt: null },
-  { id: 3, text: "Arrange books on the table",     duration: "7 min", completed: false, startedAt: null },
-  { id: 4, text: "Make the bed",                   duration: "5 min", completed: false, startedAt: null },
-  { id: 5, text: "Organize items in the drawers",  duration: "10 min", completed: false, startedAt: null },
-  { id: 6, text: "Sweep the floor",                duration: "5 min", completed: false, startedAt: null },
-]
-
-function loadFromSession(): { title: string; steps: Step[] } {
-  if (typeof window === "undefined") {
-    return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
-  }
+// ← UPDATED: now restores completed state from localStorage
+function loadFromSession(): { title: string; steps: Step[]; taskId?: number } | null {
+  if (typeof window === "undefined") return null
   try {
     const raw = window.sessionStorage.getItem("currentTask")
-    if (!raw) return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+    if (!raw) return null
     const parsed = JSON.parse(raw) as {
       title?: string
       steps?: { text: string; duration: string }[]
+      taskId?: number
     }
-    if (!parsed.steps?.length || !parsed.title) {
-      return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+    if (!parsed.steps?.length || !parsed.title) return null
+
+    // ← NEW: read completed state from localStorage userTasks
+    let completedIds: number[] = []
+    if (parsed.taskId) {
+      const tasks = JSON.parse(localStorage.getItem("userTasks") ?? "[]")
+      const savedTask = tasks.find((t: { id: number }) => t.id === parsed.taskId)
+      if (savedTask?.steps) {
+        completedIds = savedTask.steps
+          .map((s: { completed: boolean }, i: number) => s.completed ? i + 1 : null)
+          .filter(Boolean)
+      }
     }
+
     return {
       title: parsed.title,
+      taskId: parsed.taskId,
       steps: parsed.steps.map((s, i) => ({
         id: i + 1,
         text: s.text,
         duration: s.duration,
-        completed: false,
+        completed: completedIds.includes(i + 1),  // ← restores checked state
         startedAt: null,
       })),
     }
   } catch {
-    return { title: FALLBACK_TITLE, steps: FALLBACK_STEPS }
+    return null
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtTime(secs: number) {
   const m = Math.floor(secs / 60)
   const s = secs % 60
@@ -82,28 +90,38 @@ function Modal({ children }: { children: React.ReactNode }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TaskSteps() {
   const router = useRouter()
-  const [{ title, steps: initialSteps }] = useState(loadFromSession)
-  const [steps, setSteps] = useState<Step[]>(initialSteps)
+  const session = loadFromSession()
+
+  useEffect(() => {
+    if (!session) router.replace("/mytask")
+  }, [])
+
+  const title = session?.title ?? ""
+  const taskId = session?.taskId
+  const [steps, setSteps] = useState<Step[]>(session?.steps ?? [])
+
   const [activeStep, setActiveStep] = useState<number | null>(null)
   const [firstCompletedAt, setFirstCompletedAt] = useState<number | null>(null)
   const [unlocked, setUnlocked] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [completedStepDurationMs, setCompletedStepDurationMs] = useState<number>(15 * 60 * 1000)
 
-  // Modals
   const [alertMsg, setAlertMsg] = useState<string | null>(null)
   const [showProgress, setShowProgress] = useState(false)
+  const [activeStepTimeLeft, setActiveStepTimeLeft] = useState<number | null>(null)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const completedCount = steps.filter((s) => s.completed).length
   const progressPct = Math.round((completedCount / steps.length) * 100)
 
-  // ── 15-min countdown ──────────────────────────────────────────────────────
+  // ── Step-duration countdown ───────────────────────────────────────────────
   useEffect(() => {
     if (!firstCompletedAt || unlocked) return
     timerRef.current = setInterval(() => {
       const elapsed = Date.now() - firstCompletedAt
-      const rem = Math.max(0, Math.ceil((UNLOCK_AFTER_MS - elapsed) / 1000))
+      const rem = Math.max(0, Math.ceil((completedStepDurationMs - elapsed) / 1000))
       setTimeLeft(rem)
       if (rem === 0) {
         setUnlocked(true)
@@ -112,35 +130,98 @@ export default function TaskSteps() {
       }
     }, 1000)
     return () => clearInterval(timerRef.current!)
-  }, [firstCompletedAt, unlocked])
+  }, [firstCompletedAt, unlocked, completedStepDurationMs])
 
-  // ── Tap handler ───────────────────────────────────────────────────────────
+  // ── Per-step active countdown ─────────────────────────────────────────────
+  useEffect(() => {
+    clearInterval(stepTimerRef.current!)
+    if (activeStep === null) {
+      setActiveStepTimeLeft(null)
+      return
+    }
+    const activeStepObj = steps.find((s) => s.id === activeStep)
+    if (!activeStepObj?.startedAt) return
+    const durationMs = parseDurationMs(activeStepObj.duration)
+
+    const tick = () => {
+      const elapsed = Date.now() - activeStepObj.startedAt!
+      const rem = Math.max(0, Math.ceil((durationMs - elapsed) / 1000))
+      setActiveStepTimeLeft(rem)
+    }
+    tick()
+    stepTimerRef.current = setInterval(tick, 1000)
+    return () => clearInterval(stepTimerRef.current!)
+  }, [activeStep, steps])
+
+  // ← NEW: save progress to localStorage every time steps change
+  useEffect(() => {
+    if (!taskId || steps.length === 0) return
+    updateTaskProgress(
+      taskId,
+      steps.filter((s) => s.completed).length,
+      steps.length,
+      steps.map((s) => ({
+        text: s.text,
+        duration: s.duration,
+        completed: s.completed,
+      }))
+    )
+  }, [steps, taskId])
+
+  // ── Update localStorage progress (keep your existing function too) ────────
+  const updateLocalStorageProgress = useCallback((updatedSteps: Step[]) => {
+    try {
+      const raw = sessionStorage.getItem("currentTask")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        parsed.completedIds = updatedSteps.filter((s) => s.completed).map((s) => s.id)
+        sessionStorage.setItem("currentTask", JSON.stringify(parsed))
+      }
+
+      if (taskId === undefined) return
+      const tasks = JSON.parse(localStorage.getItem("userTasks") || "[]")
+      const newDone = updatedSteps.filter((s) => s.completed).length
+      const total = updatedSteps.length
+      const updated = tasks.map((t: { id: number; progress: string }) =>
+        t.id === taskId ? { ...t, progress: `${newDone}/${total}` } : t
+      )
+      localStorage.setItem("userTasks", JSON.stringify(updated))
+    } catch {}
+  }, [taskId])
+
   const handleTap = useCallback(
     (id: number) => {
       const step = steps.find((s) => s.id === id)!
 
-      // Uncheck completed
       if (step.completed) {
-        setSteps((p) => p.map((s) => (s.id === id ? { ...s, completed: false, startedAt: null } : s)))
+        const updatedSteps = steps.map((s) =>
+          s.id === id ? { ...s, completed: false, startedAt: null } : s
+        )
+        setSteps(updatedSteps)
+        updateLocalStorageProgress(updatedSteps)
         if (activeStep === id) setActiveStep(null)
         return
       }
 
-      // Tap active → complete it
       if (activeStep === id) {
-        setSteps((p) => p.map((s) => (s.id === id ? { ...s, completed: true } : s)))
+        const updatedSteps = steps.map((s) =>
+          s.id === id ? { ...s, completed: true } : s
+        )
+        setSteps(updatedSteps)
         setActiveStep(null)
-        if (completedCount === 0) setFirstCompletedAt(Date.now())
+        updateLocalStorageProgress(updatedSteps)
+        if (completedCount === 0) {
+          setFirstCompletedAt(Date.now())
+          setCompletedStepDurationMs(parseDurationMs(step.duration))
+        }
         return
       }
 
-      // Another step is active → block
       if (activeStep !== null) {
         setAlertMsg("Finish or uncheck your current active step before starting a new one.")
         return
       }
 
-      // Completed ≥ 1 but not yet unlocked → block second task
       if (completedCount >= 1 && !unlocked) {
         setAlertMsg(
           timeLeft !== null
@@ -150,14 +231,12 @@ export default function TaskSteps() {
         return
       }
 
-      // Activate
       setActiveStep(id)
       setSteps((p) => p.map((s) => (s.id === id ? { ...s, startedAt: Date.now() } : s)))
     },
-    [steps, activeStep, completedCount, unlocked, timeLeft]
+    [steps, activeStep, completedCount, unlocked, timeLeft, completedStepDurationMs, updateLocalStorageProgress]
   )
 
-  // ── Progress modal data ───────────────────────────────────────────────────
   const progressIcon = progressPct === 100 ? "🎉" : progressPct >= 50 ? "💪" : "🚀"
   const progressTitle =
     progressPct === 100 ? "All Done!" : progressPct >= 50 ? "Halfway There!" : "Just Starting!"
@@ -175,19 +254,18 @@ export default function TaskSteps() {
 
   const canViewProgress = completedCount > 0 || activeStep !== null
 
-  // ─────────────────────────────────────────────────────────────────────────
+  if (!session) return null
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-start justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="relative w-full max-w-6xl bg-blue-50 rounded-3xl overflow-hidden shadow-xl shadow-blue-200/60">
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="bg-white px-5 sm:px-8 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-blue-100">
-          {/* breadcrumb */}
           <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-widest mb-1">
             Task Breakdown
           </p>
           <div className="flex items-center gap-3">
-            {/* back arrow */}
             <button
               onClick={() => router.push("/mytask")}
               className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-base transition-colors"
@@ -198,7 +276,12 @@ export default function TaskSteps() {
 
             <h1 className="flex-1 text-[17px] sm:text-xl lg:text-2xl font-bold text-blue-950">{title}</h1>
 
-            {/* unlock badge */}
+            {activeStep !== null && activeStepTimeLeft !== null && (
+              <span className="text-[13px] font-extrabold tabular-nums text-white bg-orange-500 border border-orange-400 rounded-full px-3 py-1 shadow-md shadow-orange-200 animate-pulse">
+                ⏱ {fmtTime(activeStepTimeLeft)}
+              </span>
+            )}
+
             {firstCompletedAt && !unlocked && timeLeft !== null && (
               <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
                 🔒 {fmtTime(timeLeft)}
@@ -276,7 +359,6 @@ export default function TaskSteps() {
                   isLocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
                 ].join(" ")}
               >
-                {/* Number / check bubble */}
                 <div
                   className={[
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all duration-300",
@@ -290,31 +372,37 @@ export default function TaskSteps() {
                   {isCompleted ? "✓" : i + 1}
                 </div>
 
-                {/* Step text */}
-                <span
-                  className={[
-                    "flex-1 text-[13.5px] font-medium leading-snug",
-                    isCompleted
-                      ? "line-through text-emerald-500"
-                      : isActive
-                      ? "text-blue-900 font-semibold"
-                      : "text-slate-700",
-                  ].join(" ")}
-                >
-                  {step.text}
-                </span>
+                <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span
+                    className={[
+                      "text-[13.5px] font-medium leading-snug",
+                      isCompleted
+                        ? "line-through text-emerald-500"
+                        : isActive
+                        ? "text-blue-900 font-semibold"
+                        : "text-slate-700",
+                    ].join(" ")}
+                  >
+                    {step.text}
+                  </span>
 
-                {/* Duration / lock */}
+                  {isActive && activeStepTimeLeft !== null && (
+                    <span className="text-[12px] font-bold tabular-nums text-orange-500 tracking-wide">
+                      ⏱ {fmtTime(activeStepTimeLeft)}
+                    </span>
+                  )}
+                </div>
+
                 {isLocked ? (
                   <span className="text-base">🔒</span>
                 ) : (
                   <span
                     className={[
-                      "text-[11px] font-bold rounded-full px-2.5 py-1 flex-shrink-0",
+                      "text-[11px] font-bold rounded-full px-2.5 py-1 flex-shrink-0 whitespace-nowrap",
                       isCompleted
                         ? "bg-emerald-100 text-emerald-600"
                         : isActive
-                        ? "bg-blue-100 text-blue-700 border border-blue-200"
+                        ? "bg-indigo-100 text-indigo-600 border border-indigo-200"
                         : "bg-slate-100 text-slate-500",
                     ].join(" ")}
                   >
@@ -372,14 +460,12 @@ export default function TaskSteps() {
         {showProgress && (
           <Overlay>
             <Modal>
-              {/* Top gradient band */}
               <div className="bg-linear-to-br from-blue-600 to-indigo-700 px-6 pt-6 pb-5 text-center">
                 <div className="text-4xl mb-1">{progressIcon}</div>
                 <h2 className="text-white font-bold text-lg">{progressTitle}</h2>
                 <p className="text-blue-200 text-[12px] mt-1">{progressMsg}</p>
               </div>
 
-              {/* Ring + percentage */}
               <div className="flex justify-center pt-5 pb-2">
                 <div className="relative w-20 h-20">
                   <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
@@ -403,7 +489,6 @@ export default function TaskSteps() {
                 </div>
               </div>
 
-              {/* Step list */}
               <div className="mx-4 mb-3 bg-blue-50 rounded-xl overflow-hidden border border-blue-100">
                 {steps.map((s) => (
                   <div
@@ -426,7 +511,6 @@ export default function TaskSteps() {
                 ))}
               </div>
 
-              {/* Unlock info */}
               {unlocked && (
                 <div className="mx-4 mb-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-[12px] text-emerald-700 font-medium">
                   🔓 Multi-task mode active — work on 2 tasks at once!

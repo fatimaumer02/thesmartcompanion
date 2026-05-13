@@ -7,6 +7,7 @@ type Props = {
   title: string
   progress: string
   index?: number
+  taskId?: number  // ← ADDED
 }
 
 type ColorConfig = {
@@ -78,13 +79,34 @@ const colors: ColorConfig[] = [
   },
 ]
 
-export default function TaskCard({ title, progress, index = 0 }: Props) {
+export default function TaskCard({ title, progress, index = 0, taskId }: Props) {  // ← ADDED taskId
   const router = useRouter()
   const color = colors[index % colors.length]
 
   const [done, total] = progress.split("/").map(Number)
   const pct = Math.round((done / total) * 100)
   const segments = Array.from({ length: total }, (_, i) => i < done)
+
+  // ← ADDED: load correct task into sessionStorage before navigating
+  const handleContinue = () => {
+    if (taskId) {
+      try {
+        const tasks = JSON.parse(localStorage.getItem("userTasks") ?? "[]")
+        const task = tasks.find((t: { id: number }) => t.id === taskId)
+        if (task?.steps) {
+          sessionStorage.setItem(
+            "currentTask",
+            JSON.stringify({
+              title: task.title,
+              steps: task.steps,
+              taskId: task.id,
+            })
+          )
+        }
+      } catch {}
+    }
+    router.push("/taskinfo")
+  }
 
   return (
     <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 overflow-hidden p-4 sm:py-5 sm:pr-5 sm:pl-0">
@@ -141,7 +163,7 @@ export default function TaskCard({ title, progress, index = 0 }: Props) {
 
       {/* Button — full-width on mobile, inline on sm+ */}
       <button
-        onClick={() => router.push("/taskinfo")}
+        onClick={handleContinue}  // ← CHANGED from router.push to handleContinue
         className={`flex items-center justify-center gap-1.5 w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-white text-xs font-semibold flex-shrink-0 shadow-lg ${color.btn} ${color.btnShadow} hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200`}
       >
         Continue

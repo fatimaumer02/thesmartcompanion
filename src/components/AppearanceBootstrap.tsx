@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect } from "react";
 
 export type Theme = "Light" | "Dark" | "Auto";
@@ -31,6 +30,27 @@ export function applyTheme(theme: Theme) {
 export function applyFont(font: string) {
   if (typeof document === "undefined") return;
   const stack = FONT_STACKS[font] ?? FONT_STACKS["System Default"];
+
+  // ── new: inject font stylesheet ──────────────────────────────
+  const fontLinks: Record<string, string> = {
+    OpenDyslexic: "https://fonts.cdnfonts.com/css/opendyslexic",
+    Inter: "https://fonts.googleapis.com/css2?family=Inter&display=swap",
+    Lexend: "https://fonts.googleapis.com/css2?family=Lexend&display=swap",
+    "Roboto Mono": "https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap",
+  };
+  if (fontLinks[font]) {
+    const id = `font-link-${font.replace(/\s+/g, "-")}`;
+    if (!document.getElementById(id)) {
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = fontLinks[font];
+      document.head.appendChild(link);
+    }
+  }
+  // ────────────────────────────────────────────────────────────
+
+  document.documentElement.style.fontFamily = stack;
   document.documentElement.style.setProperty("--app-font", stack);
 }
 

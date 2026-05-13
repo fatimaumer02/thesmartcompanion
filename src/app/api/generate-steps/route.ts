@@ -1,146 +1,97 @@
-import OpenAI from "openai";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-const SYSTEM_PROMPT = `You are a task-breakdown assistant for SmartCompanion, an app for neurodivergent users (ADHD, dyslexia, autism). Given a high-level task, break it into small, concrete micro-steps the user can act on without overthinking.
-
-Rules:
-- Output 4 to 8 steps. Each step is one specific, physical action.
-- Each step's "text" is short (≤ 10 words), imperative voice, concrete verbs.
-- Estimate a realistic "duration" string (e.g. "3 min", "5 min", "10 min"). Keep each step under 15 minutes.
-- Order steps logically — easiest, most grounding action first.
-- Skip vague prep ("gather supplies", "prepare yourself") — start with a real action.
-- Adjust depth to the user's stated step-size preference.`;
-
-const stepsSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    steps: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          text: { type: "string" },
-          duration: { type: "string" },
-        },
-        required: ["text", "duration"],
-      },
-    },
-  },
-  required: ["steps"],
-} as const;
-
-type GenerateStepsBody = {
-  title?: string;
-  neurotype?: string[];
-  stepSize?: string;
-};
-
-export async function POST(request: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return Response.json(
-      { error: "Server is not configured — OPENAI_API_KEY is missing." },
-      { status: 500 },
-    );
-  }
-
-  let body: GenerateStepsBody;
+export async function POST(req: NextRequest) {
   try {
-    body = (await request.json()) as GenerateStepsBody;
-  } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
-
-  const title = body.title?.trim();
-  if (!title) {
-    return Response.json({ error: "title is required." }, { status: 400 });
-  }
-  if (title.length > 200) {
-    return Response.json({ error: "title is too long." }, { status: 400 });
-  }
-
-  const stepSize = body.stepSize || "Normal";
-  const neurotype = body.neurotype?.length ? body.neurotype.join(", ") : "unspecified";
-
-  const userMessage = `Task: ${title}
-
-User context:
-- Step size preference: ${stepSize} (Very Small = ultra-tiny atomic actions, Normal = balanced, Detailed = more granular intermediate steps)
-- Neurotype: ${neurotype}`;
-
-  const client = new OpenAI();
-
-  try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.7,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "steps_response",
-          schema: stepsSchema,
-          strict: true,
-        },
-      },
-    });
-
-    const text = completion.choices[0]?.message?.content;
-    if (!text) {
-      return Response.json(
-        { error: "Model returned no text response." },
-        { status: 502 },
-      );
-    }
-
-    const parsed = JSON.parse(text) as {
-      steps: { text: string; duration: string }[];
+    const body = await req.json();
+    const { title, neurotype, stepSize } = body as {
+      title: string;
+      neurotype?: string[];
+      stepSize?: string;
     };
 
-    if (!parsed.steps?.length) {
-      return Response.json(
-        { error: "Model returned no steps." },
-        { status: 502 },
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return NextResponse.json({ error: "Task title is required." }, { status: 400 });
+    }
+
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    if (!GROQ_API_KEY) {
+      return NextResponse.json({ error: "API key not configured." }, { status: 500 });
+    }
+
+    const neuroContext = neurotype?.length
+      ? `The user has these neurotypes/preferences: ${neurotype.join(", ")}. Tailor steps accordingly.`
+      : "";
+
+    const sizeContext =
+      stepSize === "small"
+        ? "Break the task into many small, very simple steps (6–10 steps)."
+        : stepSize === "large"
+        ? "Break the task into fewer, broader steps (3–5 steps)."
+        : "Break the task into a balanced number of steps (4–7 steps).";
+
+    const systemPrompt = `You are a helpful productivity assistant that breaks tasks into clear, actionable steps.
+${neuroContext}
+${sizeContext}
+Always respond with ONLY valid JSON in this exact format — no extra text, no markdown:
+{
+  "title": "cleaned up task title",
+  "steps": [
+    { "text": "step description", "duration": "estimated time e.g. 5 mins" }
+  ]
+}`;
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 1024,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: `Break this task into steps: "${title.trim()}"`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Groq API error:", errText);
+      return NextResponse.json(
+        { error: "Failed to generate steps. Please try again." },
+        { status: 502 }
       );
     }
 
-    return Response.json({ title, steps: parsed.steps });
+    const groqData = await response.json();
+    const rawText = groqData?.choices?.[0]?.message?.content ?? "";
+
+    let parsed: { title: string; steps: { text: string; duration: string }[] };
+    try {
+      const clean = rawText.replace(/```json|```/g, "").trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      console.error("Failed to parse Groq response:", rawText);
+      return NextResponse.json(
+        { error: "Couldn't generate steps right now. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(parsed, { status: 200 });
   } catch (err) {
-    // Log the technical details server-side, return a clean message to the client.
-    console.error("OpenAI request failed:", err);
-
-    if (err instanceof OpenAI.APIError) {
-      if (err.status === 429) {
-        return Response.json(
-          { error: "AI service is rate-limited. Please try again in a moment." },
-          { status: 429 },
-        );
-      }
-      if (err.status === 401) {
-        return Response.json(
-          { error: "AI service authentication failed. Check the API key." },
-          { status: 401 },
-        );
-      }
-      if (err.status === 402 || /quota|billing/i.test(err.message)) {
-        return Response.json(
-          { error: "AI quota exceeded. Add credits or try again later." },
-          { status: 402 },
-        );
-      }
-      return Response.json(
-        { error: "AI service is temporarily unavailable. Try again shortly." },
-        { status: err.status ?? 502 },
-      );
-    }
-
-    return Response.json(
-      { error: "Something went wrong generating steps. Please try again." },
-      { status: 500 },
+    console.error("Unexpected error:", err);
+    return NextResponse.json(
+      { error: "An unexpected error occurred." },
+      { status: 500 }
     );
   }
 }

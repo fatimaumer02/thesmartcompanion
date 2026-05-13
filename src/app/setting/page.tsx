@@ -48,7 +48,7 @@ const FONTS = [
 ]
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function SettingsPage() {
+export default function SettingPage() {
   const [theme, setThemeState] = useState<Theme>("Light")
   const [fontStyle, setFontStyleState] = useState("System Default")
   const [fontDropOpen, setFontDropOpen] = useState(false)
@@ -91,14 +91,12 @@ export default function SettingsPage() {
   }
 
   const handleSave = () => {
-    // Settings already persist as the user toggles them; this button gives
-    // visible confirmation and is a hook for future server-side sync.
     setSavedAt(Date.now())
     window.setTimeout(() => setSavedAt(null), 2500)
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
+    <div className="flex min-h-screen bg-slate-50" style={{ fontFamily: "var(--app-font)" }}>
 
       {/* Common Sidebar */}
       <Sidebar />
@@ -131,8 +129,7 @@ export default function SettingsPage() {
               </button>
 
               {fontDropOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg z-10 overflow-hidden min-w-[160px]">
-
+                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-100 rounded-xl shadow-lg z-50 overflow-hidden min-w-[160px]">
                   {FONTS.map((f) => (
                     <button
                       key={f}
@@ -268,12 +265,10 @@ function Section({
 }) {
   return (
     <div className="mb-6">
-
       <h2 className="text-[15px] font-bold text-slate-700 mb-3 tracking-tight">
         {title}
       </h2>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible">
         {children}
       </div>
     </div>
@@ -289,11 +284,9 @@ function SettingRow({
 }) {
   return (
     <div className="flex items-center justify-between px-5 py-4 gap-4">
-
       <span className="text-[14px] font-medium text-slate-700">
         {label}
       </span>
-
       {children}
     </div>
   )
@@ -312,18 +305,14 @@ function ToggleRow({
 }) {
   return (
     <div className="flex items-center justify-between px-5 py-4 gap-6">
-
       <div className="flex flex-col gap-0.5">
-
         <span className="text-[14px] font-medium text-slate-700">
           {label}
         </span>
-
         <span className="text-[12px] text-slate-400">
           {description}
         </span>
       </div>
-
       <Toggle enabled={enabled} onChange={onChange} />
     </div>
   )
