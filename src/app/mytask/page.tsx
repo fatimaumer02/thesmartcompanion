@@ -23,20 +23,14 @@ function readPreferences(): Preferences {
 
 function getStats(tasks: Task[]) {
   if (tasks.length === 0) return { overallPct: 0, completed: 0, inProgress: 0 }
-
-  const totalDone = tasks.reduce(
-    (s, t) => s + Number(t.progress.split("/")[0]), 0
-  )
-  const totalSteps = tasks.reduce(
-    (s, t) => s + Number(t.progress.split("/")[1]), 0
-  )
+  const totalDone = tasks.reduce((s, t) => s + Number(t.progress.split("/")[0]), 0)
+  const totalSteps = tasks.reduce((s, t) => s + Number(t.progress.split("/")[1]), 0)
   const overallPct = Math.round((totalDone / totalSteps) * 100)
   const completed = tasks.filter((t) => {
     const [d, tot] = t.progress.split("/").map(Number)
     return d === tot
   }).length
   const inProgress = tasks.length - completed
-
   return { overallPct, completed, inProgress }
 }
 
@@ -48,10 +42,40 @@ export default function MyTasksPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setTasks(readTasks())
+    const allTasks = readTasks()
+
+    // ── Smart fix: use id timestamp to get real creation date ──
+    const fixed = allTasks.map((t) => ({
+      ...t,
+      createdAt: t.createdAt || new Date(t.id).toDateString(),
+      createdTimestamp: t.createdTimestamp || t.id,
+    }))
+
+    const hadMissing = allTasks.some((t) => !t.createdAt)
+    if (hadMissing) {
+      localStorage.setItem("userTasks", JSON.stringify(fixed))
+    }
+
+    setTasks(fixed)
   }, [])
 
   const { overallPct, completed, inProgress } = getStats(tasks)
+
+  // ── Split into today vs previous ──
+  const today = new Date().toDateString()
+  const todayTasks = tasks.filter((t) => t.createdAt === today)
+  const previousTasks = tasks.filter((t) => t.createdAt !== today)
+
+  // ── Sort: incomplete first, completed last ──
+  const sortGroup = (group: Task[]) =>
+    [...group].sort((a, b) => {
+      const [aDone, aTotal] = a.progress.split("/").map(Number)
+      const [bDone, bTotal] = b.progress.split("/").map(Number)
+      const aComplete = aDone === aTotal
+      const bComplete = bDone === bTotal
+      if (aComplete === bComplete) return 0
+      return aComplete ? 1 : -1
+    })
 
   const handleGenerate = async () => {
     const trimmed = newTask.trim()
@@ -108,41 +132,37 @@ export default function MyTasksPage() {
   const circumference = 2 * Math.PI * 36
   const dashOffset = circumference * (1 - overallPct / 100)
 
-  const sortedTasks = [...tasks].sort((a, b) => {
-    const aDone = a.progress.split("/").map(Number)
-    const bDone = b.progress.split("/").map(Number)
-    const aComplete = aDone[0] === aDone[1]
-    const bComplete = bDone[0] === bDone[1]
-    if (aComplete === bComplete) return 0
-    return aComplete ? 1 : -1
-  })
-
   return (
     <div className="flex">
       <Sidebar />
       <div className="flex-1 ml-64 min-h-screen bg-slate-50 relative overflow-hidden">
 
-        <div className="pointer-events-none fixed -top-32 -right-32 w-500px h-500px rounded-full bg-indigo-200/30 blur-[100px]" />
-        <div className="pointer-events-none fixed -bottom-20 -left-24 w-380px h-380px rounded-full bg-emerald-200/20 blur-[80px]" />
+        <div className="pointer-events-none fixed -top-32 -right-32 w-[500px] h-[500px] rounded-full bg-indigo-200/30 blur-[100px]" />
+        <div className="pointer-events-none fixed -bottom-20 -left-24 w-[380px] h-[380px] rounded-full bg-emerald-200/20 blur-[80px]" />
 
         <div className="relative z-10 max-w-2xl mx-auto px-6 py-12">
 
-          {/* Header */}
+          {/* ── Header ── */}
           <div className="flex items-start justify-between mb-8">
             <div>
               <p className="text-sm text-slate-400 font-medium mb-1">👋 Good morning</p>
-              <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-tight">My Tasks</h1>
-              <p className="text-sm text-slate-400 mt-2">Track and manage all your daily tasks.</p>
+              <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-tight">
+                My Tasks
+              </h1>
+              <p className="text-sm text-slate-400 mt-2">
+                Track and manage all your daily tasks.
+              </p>
             </div>
 
             {/* Progress Ring */}
-            <div className="relative w-20 h-20 flex-0">
+            <div className="relative w-20 h-20 flex-shrink-0">
               <svg width="80" height="80" viewBox="0 0 88 88">
                 <circle cx="44" cy="44" r="36" fill="none" stroke="#e2e8f0" strokeWidth="8" />
                 <circle
                   cx="44" cy="44" r="36" fill="none"
                   stroke="url(#grad)" strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={circumference} strokeDashoffset={dashOffset}
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
                   transform="rotate(-90 44 44)"
                 />
                 <defs>
@@ -153,13 +173,15 @@ export default function MyTasksPage() {
                 </defs>
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-base font-extrabold text-slate-800 leading-none">{overallPct}%</span>
+                <span className="text-base font-extrabold text-slate-800 leading-none">
+                  {overallPct}%
+                </span>
                 <span className="text-[10px] text-slate-400 font-medium">done</span>
               </div>
             </div>
           </div>
 
-          {/* Stats Strip */}
+          {/* ── Stats Strip ── */}
           <div className="bg-white rounded-2xl shadow-sm px-6 py-4 flex items-center justify-around mb-8">
             <div className="flex flex-col items-center gap-1">
               <span className="text-2xl font-extrabold text-indigo-500">{tasks.length}</span>
@@ -177,11 +199,13 @@ export default function MyTasksPage() {
             </div>
           </div>
 
-          {/* New Task */}
+          {/* ── New Task Input ── */}
           <div className="bg-white rounded-2xl shadow-sm p-5 mb-8 border border-indigo-100/70">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-lg">✨</span>
-              <h2 className="text-sm font-bold text-slate-700">Break a new task into steps</h2>
+              <h2 className="text-sm font-bold text-slate-700">
+                Break a new task into steps
+              </h2>
             </div>
             <p className="text-xs text-slate-400 mb-3">
               Type what you want to do. AI will split it into micro-steps tuned to your profile.
@@ -199,7 +223,7 @@ export default function MyTasksPage() {
               <button
                 onClick={handleGenerate}
                 disabled={generating || !newTask.trim()}
-                className="px-5 py-2.5 rounded-xl bg-linear-to-r from-indigo-500 to-blue-500 text-white text-sm font-semibold shadow-md shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 text-white text-sm font-semibold shadow-md shadow-indigo-200 hover:shadow-indigo-300 hover:-translate-y-0.5 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 {generating ? "Generating…" : "Generate Steps"}
               </button>
@@ -211,21 +235,85 @@ export default function MyTasksPage() {
             )}
           </div>
 
-          {/* Task List */}
-          {tasks.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm mt-10">No tasks yet. Add one above!</p>
-          ) : (
-            <>
+          {/* ── Empty State ── */}
+          {tasks.length === 0 && (
+            <p className="text-center text-slate-400 text-sm mt-10">
+              No tasks yet. Add one above!
+            </p>
+          )}
+
+          {/* ── Today's Tasks ── */}
+          {todayTasks.length > 0 && (
+            <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">All Tasks</span>
-                <span className="bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">{tasks.length}</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Today
+                </span>
+                <span className="bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                  {todayTasks.length}
+                </span>
+                <span className="text-[11px] text-slate-400 ml-1">{today}</span>
               </div>
               <div className="flex flex-col gap-3.5">
-                {sortedTasks.map((task, i) => (
-                  <TaskCard key={task.id} title={task.title} progress={task.progress} index={i} taskId={task.id} />
+                {sortGroup(todayTasks).map((task, i) => (
+                  <TaskCard
+                    key={task.id}
+                    title={task.title}
+                    progress={task.progress}
+                    index={i}
+                    taskId={task.id}
+                  />
                 ))}
               </div>
-            </>
+            </div>
+          )}
+
+          {/* ── Previous Tasks grouped by date ── */}
+          {previousTasks.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Previous
+                </span>
+                <span className="bg-slate-400 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                  {previousTasks.length}
+                </span>
+              </div>
+
+              {/* Group by date — newest first */}
+              {(() => {
+                const dates = [
+                  ...new Set(previousTasks.map((t) => t.createdAt))
+                ].sort(
+                  (a, b) => new Date(b).getTime() - new Date(a).getTime()
+                )
+
+                return dates.map((date) => {
+                  const tasksOnDate = previousTasks.filter(
+                    (t) => t.createdAt === date
+                  )
+                  return (
+                    <div key={date} className="mb-6">
+                      <p className="text-[11px] font-semibold text-slate-400 mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
+                        {date}
+                      </p>
+                      <div className="flex flex-col gap-3.5">
+                        {sortGroup(tasksOnDate).map((task, i) => (
+                          <TaskCard
+                            key={task.id}
+                            title={task.title}
+                            progress={task.progress}
+                            index={i}
+                            taskId={task.id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
           )}
 
         </div>

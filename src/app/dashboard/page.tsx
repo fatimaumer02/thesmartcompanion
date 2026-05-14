@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import ProgressCard from "../../components/ProgressCard"
 import TaskCard from "../../components/TaskCard"
-import { readTasks, saveTask, type Task } from "../../lib/task"
+import { readTodayTasks, saveTask, type Task } from "../../lib/task"  // ← CHANGED
 
 type UserProfile = {
   name?: string
@@ -46,20 +46,18 @@ export default function DashboardPage() {
   const [firstName, setFirstName] = useState("")
   const [tasks, setTasks] = useState<Task[]>([])
 
-  // ── Load user profile + tasks from localStorage on mount ──
   useEffect(() => {
     const profile = readUserProfile()
     if (profile.name) {
       setFirstName(profile.name.trim().split(/\s+/)[0])
     }
-    setTasks(readTasks())
+    setTasks(readTodayTasks())  // ← CHANGED
   }, [])
 
-  // ── Re-read tasks when user comes back to tab/page ──        ← REPLACED
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        setTasks(readTasks())
+        setTasks(readTodayTasks())  // ← CHANGED
       }
     }
     document.addEventListener("visibilitychange", handleVisibility)
@@ -99,11 +97,9 @@ export default function DashboardPage() {
         return
       }
 
-      // ── Save task with steps to localStorage ──
       const newTask = saveTask(data.title, data.steps.length, data.steps)
       setTasks((prev) => [...prev, newTask])
 
-      // ── Store in sessionStorage with taskId ──
       sessionStorage.setItem(
         "currentTask",
         JSON.stringify({
@@ -120,6 +116,16 @@ export default function DashboardPage() {
       setGenerating(false)
     }
   }
+
+  // ── Sort: incomplete first, completed last ──
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const [aDone, aTotal] = a.progress.split("/").map(Number)
+    const [bDone, bTotal] = b.progress.split("/").map(Number)
+    const aComplete = aDone === aTotal
+    const bComplete = bDone === bTotal
+    if (aComplete === bComplete) return 0
+    return aComplete ? 1 : -1
+  })
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 px-4 sm:px-6 py-6 sm:py-8">
@@ -149,9 +155,7 @@ export default function DashboardPage() {
               placeholder="Example: Clean my room, Study math..."
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleGenerate()
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleGenerate() }}
               disabled={generating}
             />
             <button
@@ -180,11 +184,11 @@ export default function DashboardPage() {
       {/* Progress */}
       <ProgressCard />
 
-      {/* Tasks */}
-      {tasks.length > 0 && (
+      {/* Today's Tasks — incomplete first */}
+      {sortedTasks.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Today&apos;s Tasks</h2>
-          {tasks.map((task, i) => (
+          {sortedTasks.map((task, i) => (
             <TaskCard
               key={task.id}
               title={task.title}
@@ -193,6 +197,12 @@ export default function DashboardPage() {
               taskId={task.id}
             />
           ))}
+        </div>
+      )}
+
+      {sortedTasks.length === 0 && (
+        <div className="text-center py-12 text-gray-400 text-sm">
+          No tasks for today yet. Add one above!
         </div>
       )}
 
