@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation"
 import ProgressCard from "../../components/ProgressCard"
 import TaskCard from "../../components/TaskCard"
 import { readTodayTasks, saveTask, type Task } from "../../lib/task"  // ← CHANGED
+import Button3D from "../../components/Button3D"
+import AmbientScene from "../../components/AmbientScene"
 
 type UserProfile = {
   name?: string
@@ -128,7 +130,10 @@ export default function DashboardPage() {
   })
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 px-4 sm:px-6 py-6 sm:py-8">
+    <div className="relative min-h-screen">
+      {/* Ambient Three.js backdrop — calm floating shapes */}
+      <AmbientScene variant="calm" opacity={0.35} />
+      <div className="relative max-w-5xl mx-auto space-y-6 px-4 sm:px-6 py-6 sm:py-8">
 
       {/* Header */}
       <div className="flex justify-between items-center gap-4">
@@ -166,13 +171,14 @@ export default function DashboardPage() {
               <Mic size={18} className="text-blue-600" />
             </button>
           </div>
-          <button
+          <Button3D
             onClick={handleGenerate}
             disabled={generating || !taskTitle.trim()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg whitespace-nowrap hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            shadowColor="blue"
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg whitespace-nowrap font-semibold disabled:cursor-not-allowed disabled:opacity-50"
           >
             {generating ? "Generating…" : "Break into Steps"}
-          </button>
+          </Button3D>
         </div>
         {error && (
           <p className="mt-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
@@ -206,6 +212,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      </div>
     </div>
   )
 }

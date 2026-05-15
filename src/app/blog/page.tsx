@@ -9,7 +9,7 @@ const featured = {
   title: "Why we removed streaks from SmartCompanion",
   excerpt:
     "Streaks weaponize consistency. For an ADHD brain, one missed day can erase a month of momentum. Here's what we built instead.",
-  author: "Shaya Ahmad",
+  author: "Shayam Ahmad",
   date: "May 8, 2026",
   readTime: "6 min read",
   accent: "from-blue-500 to-indigo-500",
@@ -76,7 +76,7 @@ const posts: Post[] = [
     title: "What we're shipping in Q3",
     excerpt:
       "Voice journaling, shared accountability circles, and a calmer notification engine. Here's the roadmap.",
-    author: "Shaya Ahmad",
+    author: "Shayam Ahmad",
     date: "Apr 3, 2026",
     readTime: "3 min read",
     tint: "bg-blue-50",

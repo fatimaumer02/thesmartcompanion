@@ -1,3 +1,6 @@
+import TiltCard from "./TiltCard";
+import ScrollReveal from "./ScrollReveal";
+
 const features = [
   {
     icon: "🎯",
@@ -37,17 +40,20 @@ export default function Features() {
   return (
     <section className="px-8 pb-10">
       {/* Section header */}
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-          Challenges We Help With
-        </h2>
-      </div>
+      <ScrollReveal from="up">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">
+            Challenges We Help With
+          </h2>
+        </div>
+      </ScrollReveal>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {features.map((item, i) => (
+          <ScrollReveal key={i} from="up" delay={0.1 * i}>
+          <TiltCard maxTilt={10}>
           <div
-            key={i}
-            className="group relative bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-blue-200/40 transition-shadow duration-300 cursor-pointer overflow-hidden h-full"
           >
             {/* Subtle bg on hover */}
             <div
@@ -74,6 +80,8 @@ export default function Features() {
               />
             </div>
           </div>
+          </TiltCard>
+          </ScrollReveal>
         ))}
       </div>
 

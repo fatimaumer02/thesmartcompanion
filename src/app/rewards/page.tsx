@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import { readTasks, type Task } from "../../lib/task";
+import TiltCard from "../../components/TiltCard";
+import AmbientScene from "../../components/AmbientScene";
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 type Stats = {
@@ -132,6 +134,7 @@ function CircleBadge({ badge, earned }: { badge: Badge; earned: boolean }) {
   const innerR = midR - 9;
 
   return (
+    <TiltCard maxTilt={earned ? 14 : 4}>
     <div
       className={`flex flex-col items-center gap-2.5 transition-all duration-200 ${
         earned ? "" : "opacity-50"
@@ -184,6 +187,7 @@ function CircleBadge({ badge, earned }: { badge: Badge; earned: boolean }) {
         </div>
       </div>
     </div>
+    </TiltCard>
   );
 }
 
@@ -197,12 +201,14 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-4 py-5 sm:py-6 text-center hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
-      <div className={`text-3xl sm:text-4xl font-black leading-none mb-1.5 ${color}`}>
-        {value}
+    <TiltCard maxTilt={10}>
+      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-4 py-5 sm:py-6 text-center hover:shadow-xl hover:shadow-blue-200/40 transition-shadow duration-200">
+        <div className={`text-3xl sm:text-4xl font-black leading-none mb-1.5 ${color}`}>
+          {value}
+        </div>
+        <div className="text-xs text-slate-500 font-bold">{label}</div>
       </div>
-      <div className="text-xs text-slate-500 font-bold">{label}</div>
-    </div>
+    </TiltCard>
   );
 }
 
@@ -252,8 +258,10 @@ export default function RewardsPage() {
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
 
-      <main className="flex-1 min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-50 lg:ml-64 px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <div className="max-w-4xl mx-auto">
+      <main className="relative flex-1 min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-50 lg:ml-64 px-4 sm:px-6 lg:px-8 py-8 lg:py-12 overflow-hidden">
+        {/* Celebratory Three.js backdrop — warm shapes floating behind the page */}
+        <AmbientScene variant="celebrate" opacity={0.45} />
+        <div className="relative max-w-4xl mx-auto">
 
           <h1 className="text-2xl sm:text-3xl font-black text-blue-900 tracking-tight mb-8 flex items-center gap-2">
             <span>🏆</span> Rewards

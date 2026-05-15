@@ -2,6 +2,8 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
+import Button3D from "../../components/Button3D";
+import HeroScene from "../../components/HeroScene";
 
 const ADMIN_EMAIL = "admin@smartcompanion.com"
 const ADMIN_PASSWORD = "admin@123"
@@ -67,16 +69,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100">
       <div className="flex w-[900px] bg-white rounded-3xl shadow-xl overflow-hidden">
 
-        {/* Left Side */}
-        <div className="w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center p-10 gap-6">
-          <Image
-            src="/login.png"
-            alt="Illustration"
-            width={320}
-            height={320}
-            className="rounded-2xl"
-          />
-          <div className="text-center">
+        {/* Left Side — Three.js orbiting companion scene */}
+        <div className="w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
+          <div className="w-72 h-72">
+            <HeroScene />
+          </div>
+          <div className="text-center relative z-10">
             <h2 className="text-white text-2xl font-bold">Smart Companion</h2>
             <p className="text-blue-200 text-sm mt-1">Your neuro-inclusive AI assistant</p>
           </div>
@@ -167,17 +165,18 @@ export default function LoginPage() {
           )}
 
           {/* Login Button */}
-          <button
+          <Button3D
             onClick={handleLogin}
+            shadowColor={mode === "admin" ? "indigo" : "blue"}
             className={[
-              "w-full text-white py-3 rounded-xl font-bold text-sm hover:opacity-90 transition-all shadow-md mb-4",
+              "w-full text-white py-3 rounded-xl font-bold text-sm mb-4",
               mode === "admin"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 shadow-indigo-200"
-                : "bg-gradient-to-r from-blue-500 to-indigo-600 shadow-blue-200"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600"
+                : "bg-gradient-to-r from-blue-500 to-indigo-600"
             ].join(" ")}
           >
             {mode === "admin" ? "Login as Admin" : "Login"}
-          </button>
+          </Button3D>
 
           {/* Social — user only */}
           {mode === "user" && (

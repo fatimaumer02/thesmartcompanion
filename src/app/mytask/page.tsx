@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Sidebar from "../../components/Sidebar"
 import TaskCard from "../../components/TaskCard"
 import { readTasks, saveTask, type Task } from "../../lib/task"
+import AmbientScene from "../../components/AmbientScene"
 
 type Preferences = {
   neurotypes?: string[]
@@ -136,6 +137,7 @@ export default function MyTasksPage() {
     <div className="flex">
       <Sidebar />
       <div className="flex-1 ml-64 min-h-screen bg-slate-50 relative overflow-hidden">
+        <AmbientScene variant="calm" opacity={0.35} />
 
         <div className="pointer-events-none fixed -top-32 -right-32 w-[500px] h-[500px] rounded-full bg-indigo-200/30 blur-[100px]" />
         <div className="pointer-events-none fixed -bottom-20 -left-24 w-[380px] h-[380px] rounded-full bg-emerald-200/20 blur-[80px]" />

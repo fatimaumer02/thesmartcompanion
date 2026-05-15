@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { readTasks, type Task } from "../lib/task";
+import TiltCard from "./TiltCard";
 
 function parseProgress(progress: string): { done: number; total: number } {
   const [d, t] = progress.split("/").map(Number);
@@ -117,7 +118,8 @@ export default function ProgressCard() {
 
   return (
     <>
-      <div className="relative bg-white rounded-2xl shadow-sm overflow-hidden p-4 sm:py-5 sm:px-6 sm:pl-8">
+      <TiltCard maxTilt={5}>
+      <div className="relative bg-white rounded-2xl shadow-sm hover:shadow-xl hover:shadow-emerald-200/40 transition-shadow duration-300 overflow-hidden p-4 sm:py-5 sm:px-6 sm:pl-8">
 
         {/* Left accent bar — matches TaskCard style */}
         <div className="absolute left-0 right-0 top-0 h-1 sm:right-auto sm:bottom-0 sm:h-auto sm:w-1.5 sm:rounded-l-2xl bg-linear-to-b from-emerald-400 to-emerald-600" />
@@ -154,6 +156,7 @@ export default function ProgressCard() {
             : "No tasks today yet — break one into steps to begin."}
         </p>
       </div>
+      </TiltCard>
 
       {/* ── History Modal ────────────────────────────────────────────── */}
       {showHistory && (

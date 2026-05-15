@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import TiltCard from "../../components/TiltCard";
+import AmbientScene from "../../components/AmbientScene";
 
 const faqs = [
   {
@@ -65,6 +67,9 @@ export default function HelpPage() {
 
         <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-100 p-5 lg:p-10 relative overflow-hidden">
 
+          {/* Three.js ambient backdrop */}
+          <AmbientScene variant="calm" opacity={0.35} />
+
           {/* Background decoration */}
           <div className="pointer-events-none fixed inset-0 overflow-hidden">
             <div className="absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-3xl" />
@@ -120,8 +125,8 @@ export default function HelpPage() {
                 const isOpen = openId === faq.id;
 
                 return (
+                  <TiltCard key={faq.id} maxTilt={isOpen ? 2 : 6}>
                   <div
-                    key={faq.id}
                     className={`rounded-2xl border-2 overflow-hidden transition-all duration-300 ${
                       isOpen
                         ? "bg-white border-blue-600 shadow-xl shadow-blue-100/60"
@@ -173,6 +178,7 @@ export default function HelpPage() {
                       </div>
                     )}
                   </div>
+                  </TiltCard>
                 );
               })}
             </div>

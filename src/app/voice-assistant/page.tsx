@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";  // ← ADDED
 import Sidebar from "../../components/Sidebar";
 import useVapi from "../../app/hooks/useVapi";
 import { applyTheme, type Theme } from "../../components/AppearanceBootstrap";
+import AmbientScene from "../../components/AmbientScene";
 
 export default function VoiceInput() {
   const [taskText, setTaskText] = useState("");
@@ -91,8 +92,9 @@ export default function VoiceInput() {
     <div className={`app-wrapper ${isDark ? "dark" : "light"}`}>
       <Sidebar />
 
-      <div className="main-content">
-        <div className="page">
+      <div className="main-content" style={{ position: "relative", overflow: "hidden" }}>
+        <AmbientScene variant="calm" opacity={0.35} />
+        <div className="page" style={{ position: "relative", zIndex: 1 }}>
 
           {/* Badge */}
           <div className="top-labels">

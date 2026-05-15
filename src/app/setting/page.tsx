@@ -7,6 +7,8 @@ import {
   applyTheme,
   type Theme,
 } from "../../components/AppearanceBootstrap"
+import TiltCard from "../../components/TiltCard"
+import AmbientScene from "../../components/AmbientScene"
 
 // ─── Toggle Switch Component ──────────────────────────────────────────────────
 function Toggle({
@@ -102,7 +104,8 @@ export default function SettingPage() {
       <Sidebar />
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-6 md:p-10 max-w-2xl">
+      <main className="relative flex-1 ml-64 p-6 md:p-10 max-w-2xl overflow-hidden">
+        <AmbientScene variant="calm" opacity={0.3} />
 
         {/* Page Title */}
         <h1 className="text-2xl font-bold text-slate-800 mb-7 tracking-tight">
@@ -268,9 +271,11 @@ function Section({
       <h2 className="text-[15px] font-bold text-slate-700 mb-3 tracking-tight">
         {title}
       </h2>
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible">
-        {children}
-      </div>
+      <TiltCard maxTilt={4}>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-200/40 transition-shadow duration-300 overflow-visible">
+          {children}
+        </div>
+      </TiltCard>
     </div>
   )
 }

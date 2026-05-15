@@ -2,6 +2,7 @@
 
 import React from "react"
 import { useRouter } from "next/navigation"
+import TiltCard from "./TiltCard"
 
 type Props = {
   title: string
@@ -109,7 +110,8 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
   }
 
   return (
-    <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 overflow-hidden p-4 sm:py-5 sm:pr-5 sm:pl-0">
+    <TiltCard maxTilt={6}>
+    <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white rounded-2xl shadow-sm hover:shadow-xl hover:shadow-blue-200/40 transition-shadow duration-300 overflow-hidden p-4 sm:py-5 sm:pr-5 sm:pl-0">
 
       {/* Left accent bar — vertical on sm+, top strip on mobile */}
       <div className={`absolute left-0 right-0 top-0 h-1 sm:right-auto sm:bottom-0 sm:h-auto sm:w-1.5 sm:rounded-l-2xl ${color.bar}`} />
@@ -173,5 +175,6 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
       </button>
 
     </div>
+    </TiltCard>
   )
 }

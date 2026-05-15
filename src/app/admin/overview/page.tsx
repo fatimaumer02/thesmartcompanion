@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Users, ClipboardList, TrendingUp, Bell } from "lucide-react"
+import TiltCard from "../../../components/TiltCard"
 
 type User = {
   id: number
@@ -72,18 +73,19 @@ export default function OverviewPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((s, i) => (
-          <div
-            key={i}
-            className={`bg-white rounded-2xl border ${s.border} p-5 flex items-center gap-4 shadow-sm`}
-          >
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.color}`}>
-              {s.icon}
+          <TiltCard key={i} maxTilt={10}>
+            <div
+              className={`bg-white rounded-2xl border ${s.border} p-5 flex items-center gap-4 shadow-sm hover:shadow-xl hover:shadow-blue-200/40 transition-shadow duration-300`}
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.color}`}>
+                {s.icon}
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                <p className="text-xs text-slate-400 font-medium">{s.label}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xl font-bold text-slate-800">{s.value}</p>
-              <p className="text-xs text-slate-400 font-medium">{s.label}</p>
-            </div>
-          </div>
+          </TiltCard>
         ))}
       </div>
 

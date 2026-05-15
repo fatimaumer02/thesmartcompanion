@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Button3D from "../../components/Button3D";
+import TiltCard from "../../components/TiltCard";
 
 const neurotypes = ["ADHD", "Dyslexia", "Autism", "Other"];
 const supportLevels = ["Very Small", "Normal", "Detailed"];
@@ -60,8 +62,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
+    <TiltCard maxTilt={5}>
     <div
-      className={`relative bg-white/70 backdrop-blur-sm rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-200/30 ${
+      className={`relative bg-white/70 backdrop-blur-sm rounded-2xl border p-6 transition-shadow duration-300 hover:shadow-xl hover:shadow-blue-200/40 ${
         filled
           ? "border-blue-300 shadow-md shadow-blue-200/40"
           : "border-gray-200/80 hover:border-blue-200"
@@ -85,6 +88,7 @@ function SectionCard({
       <h3 className="text-sm font-bold text-gray-800 mb-4">{title}</h3>
       {children}
     </div>
+    </TiltCard>
   );
 }
 
@@ -289,37 +293,23 @@ export default function ProfileSetup() {
         </div>
 
         {/* ── Continue ──────────────────────────────────────────── */}
-        <button
+        <Button3D
           onClick={handleContinue}
           disabled={!allComplete}
+          shadowColor={allComplete ? "indigo" : "slate"}
           style={
             allComplete
-              ? {
-                background: "linear-gradient(135deg, #93c5fd, #2563eb)",
-                boxShadow: "0 6px 20px rgba(124,58,237,0.30)",
-              }
+              ? { background: "linear-gradient(135deg, #93c5fd, #2563eb)" }
               : undefined
           }
-          onMouseEnter={(e) => {
-            if (!allComplete) return;
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 12px 28px rgba(124,58,237,0.42)";
-            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px) scale(1.005)";
-          }}
-          onMouseLeave={(e) => {
-            if (!allComplete) return;
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(124,58,237,0.30)";
-            (e.currentTarget as HTMLButtonElement).style.transform = "none";
-          }}
-          className={`w-full py-4 rounded-2xl text-white font-bold text-sm transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] ${
-            allComplete
-              ? ""
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          className={`w-full py-4 rounded-2xl text-white font-bold text-sm ${
+            allComplete ? "" : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
           {allComplete
             ? "Save & Continue →"
             : `Complete ${totalSections - completedCount} more to continue`}
-        </button>
+        </Button3D>
       </div>
     </div>
   );

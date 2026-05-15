@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { updateTaskProgress } from "../lib/task"  // ← ADD this import
+import Button3D from "./Button3D"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = {
@@ -450,18 +451,20 @@ export default function TaskSteps() {
 
         {/* ── View Progress button ───────────────────────────────────────────── */}
         <div className="px-4 sm:px-8 pt-3 sm:pt-5 pb-6 sm:pb-8 max-w-md mx-auto w-full">
-          <button
+          <Button3D
             onClick={() => canViewProgress && setShowProgress(true)}
+            disabled={!canViewProgress}
+            shadowColor={canViewProgress ? "indigo" : "slate"}
             className={[
-              "w-full py-4 rounded-2xl text-[15px] font-bold tracking-wide flex items-center justify-center gap-2 transition-all duration-200",
+              "w-full py-4 rounded-2xl text-[15px] font-bold tracking-wide flex items-center justify-center gap-2",
               canViewProgress
-                ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-300/50 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98]"
+                ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white"
                 : "bg-blue-200 text-blue-400 cursor-not-allowed",
             ].join(" ")}
           >
             <span className="text-lg">📊</span>
             View Progress
-          </button>
+          </Button3D>
           {!canViewProgress && (
             <p className="text-center text-[11px] text-blue-400 mt-1.5">
               Start a task to enable progress view
