@@ -9,6 +9,7 @@ import {
 } from "../../components/AppearanceBootstrap"
 import TiltCard from "../../components/TiltCard"
 import AmbientScene from "../../components/AmbientScene"
+import { loadState, setSoundEnabled } from "../../lib/gamification"
 
 // ─── Toggle Switch Component ──────────────────────────────────────────────────
 function Toggle({
@@ -59,6 +60,7 @@ export default function SettingPage() {
   const [highContrast, setHighContrast] = useState(true)
   const [reduceAnim, setReduceAnim] = useState(false)
   const [haptic, setHaptic] = useState(true)
+  const [soundFx, setSoundFx] = useState(false)
 
   const [notifEmail, setNotifEmail] = useState(true)
   const [notifPush, setNotifPush] = useState(false)
@@ -71,10 +73,16 @@ export default function SettingPage() {
       const storedFont = localStorage.getItem("appearance.font")
       if (storedTheme) setThemeState(storedTheme)
       if (storedFont) setFontStyleState(storedFont)
+      setSoundFx(loadState().soundEnabled)
     } catch {
       // localStorage unavailable
     }
   }, [])
+
+  const toggleSoundFx = (next: boolean) => {
+    setSoundFx(next)
+    setSoundEnabled(next)
+  }
 
   const setTheme = (next: Theme) => {
     setThemeState(next)
@@ -104,7 +112,7 @@ export default function SettingPage() {
       <Sidebar />
 
       {/* Main Content */}
-      <main className="relative flex-1 ml-64 p-6 md:p-10 max-w-2xl overflow-hidden">
+      <main className="relative flex-1 lg:ml-64 p-4 sm:p-6 md:p-10 pt-20 lg:pt-10 w-full lg:max-w-2xl overflow-hidden">
         <AmbientScene variant="calm" opacity={0.3} />
 
         {/* Page Title */}
@@ -206,6 +214,15 @@ export default function SettingPage() {
             description="Vibrate on interactions (mobile only)"
             enabled={haptic}
             onChange={setHaptic}
+          />
+
+          <Divider />
+
+          <ToggleRow
+            label="Sound Effects"
+            description="Soft tones on step completion, task wins, and achievements"
+            enabled={soundFx}
+            onChange={toggleSoundFx}
           />
         </Section>
 

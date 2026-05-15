@@ -4,6 +4,18 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { updateTaskProgress } from "../lib/task"  // ← ADD this import
 import Button3D from "./Button3D"
+import {
+  awardStepXP,
+  awardTaskComplete,
+  type Achievement,
+} from "../lib/gamification"
+import { useSoundFX } from "../lib/soundfx"
+import XPBar from "./game/XPBar"
+import StreakFlame from "./game/StreakFlame"
+import ConfettiBurst from "./game/ConfettiBurst"
+import AchievementToast from "./game/AchievementToast"
+import XPFloater from "./game/XPFloater"
+import MotivationalMessage from "./game/MotivationalMessage"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = {
@@ -116,12 +128,93 @@ export default function TaskSteps() {
   const [alertMsg, setAlertMsg] = useState<string | null>(null)
   const [showProgress, setShowProgress] = useState(false)
   const [activeStepTimeLeft, setActiveStepTimeLeft] = useState<number | null>(null)
+  // AI-generated closing compliment shown once the task hits 100%.
+  const [compliment, setCompliment] = useState<string | null>(null)
+  const [complimentLoading, setComplimentLoading] = useState(false)
+
+  // Gamification UI state — confetti at 100%, achievement queue, floating XP.
+  const [confettiActive, setConfettiActive] = useState(false)
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([])
+  const [xpFloaters, setXpFloaters] = useState<Record<number, number>>({})
+  const taskCompletionAwardedRef = useRef(false)
+  const playSound = useSoundFX()
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const completedCount = steps.filter((s) => s.completed).length
   const progressPct = Math.round((completedCount / steps.length) * 100)
+
+  // Task-complete one-shot: award bonus XP, bump streak, fire confetti.
+  // Ref-guarded so it can't double-fire on re-render or step-uncheck/recheck.
+  useEffect(() => {
+    if (progressPct !== 100) {
+      taskCompletionAwardedRef.current = false
+      return
+    }
+    if (taskCompletionAwardedRef.current) return
+    taskCompletionAwardedRef.current = true
+    const award = awardTaskComplete()
+    setConfettiActive(true)
+    if (award.unlocked.length > 0) {
+      setAchievementQueue((q) => [...q, ...award.unlocked])
+    }
+    playSound("complete")
+    if (award.leveledUp) playSound("levelup")
+    const id = window.setTimeout(() => setConfettiActive(false), 2400)
+    return () => window.clearTimeout(id)
+  }, [progressPct, playSound])
+
+  // ── Fetch a unique compliment when the task hits 100% ────────────────────
+  // The compliment is generated server-side by an LLM with a system prompt
+  // tuned for neurodivergent users — it acknowledges the effort of crossing
+  // the intention→action gap rather than producing generic cheerleading.
+  useEffect(() => {
+    if (progressPct !== 100) return
+    if (compliment || complimentLoading) return
+    if (!title) return
+
+    setComplimentLoading(true)
+    let cancelled = false
+    const fetchCompliment = async () => {
+      try {
+        // Pull the user's neurotype so the model can tailor the tone.
+        let neurotype: string[] | undefined
+        try {
+          const raw = localStorage.getItem("preferences")
+          if (raw) {
+            const parsed = JSON.parse(raw) as { neurotypes?: string[] }
+            neurotype = parsed.neurotypes
+          }
+        } catch {}
+
+        const res = await fetch("/api/generate-compliment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            stepCount: steps.length,
+            neurotype,
+          }),
+        })
+        const data = (await res.json()) as
+          | { compliment: string }
+          | { error: string }
+        if (cancelled) return
+        if (res.ok && "compliment" in data) {
+          setCompliment(data.compliment)
+        }
+      } catch {
+        // Silent fail — we'll just show the static fallback message.
+      } finally {
+        if (!cancelled) setComplimentLoading(false)
+      }
+    }
+    fetchCompliment()
+    return () => {
+      cancelled = true
+    }
+  }, [progressPct, compliment, complimentLoading, title, steps.length])
 
   // ── Step-duration countdown ───────────────────────────────────────────────
   useEffect(() => {
@@ -226,6 +319,17 @@ export default function TaskSteps() {
         setSteps(updatedSteps)
         setActiveStep(null)
         updateLocalStorageProgress(updatedSteps)
+
+        // Gamification: award step XP + queue any unlocked achievements +
+        // float a "+10 XP" badge over the step that was just checked.
+        const award = awardStepXP()
+        setXpFloaters((prev) => ({ ...prev, [id]: award.xpGained }))
+        if (award.unlocked.length > 0) {
+          setAchievementQueue((q) => [...q, ...award.unlocked])
+          playSound("achievement")
+        }
+        if (award.leveledUp) playSound("levelup")
+        else playSound("step")
         // Only start the cooldown if this is the first real completion AND the
         // user actually spent meaningful time on it. Steps finished in <10s
         // are "quick wins" — let them keep moving without throttle.
@@ -274,7 +378,10 @@ export default function TaskSteps() {
   const activeStepObj = steps.find((s) => s.id === activeStep)
   const progressMsg =
     progressPct === 100
-      ? `Nicely done! All ${steps.length} steps complete.`
+      ? compliment ??
+        (complimentLoading
+          ? "Composing a note for you…"
+          : `Nicely done. All ${steps.length} steps complete.`)
       : activeStepObj
       ? `${completedCount}/${steps.length} done. Working on: "${activeStepObj.text}"`
       : completedCount === 0
@@ -289,6 +396,8 @@ export default function TaskSteps() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-start justify-center py-8 px-4 sm:px-6 lg:px-8">
+      <ConfettiBurst active={confettiActive} />
+      <AchievementToast achievements={achievementQueue} />
       <div className="relative w-full max-w-6xl bg-blue-50 rounded-3xl overflow-hidden shadow-xl shadow-blue-200/60">
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
@@ -306,6 +415,8 @@ export default function TaskSteps() {
             </button>
 
             <h1 className="flex-1 text-[17px] sm:text-xl lg:text-2xl font-bold text-blue-950">{title}</h1>
+
+            <StreakFlame />
 
             {activeStep !== null && activeStepTimeLeft !== null && (
               <span className="text-[13px] font-extrabold tabular-nums text-white bg-orange-500 border border-orange-400 rounded-full px-3 py-1 shadow-md shadow-orange-200 animate-pulse">
@@ -325,9 +436,16 @@ export default function TaskSteps() {
             )}
           </div>
 
-          <p className="text-[12px] text-blue-400 mt-1 ml-11">
-            {steps.length} Steps{completedCount > 0 ? ` · ${completedCount} completed` : ""}
-          </p>
+          <div className="flex items-center justify-between gap-3 mt-1 ml-11">
+            <p className="text-[12px] text-blue-400">
+              {steps.length} Steps{completedCount > 0 ? ` · ${completedCount} completed` : ""}
+            </p>
+            <MotivationalMessage progressPct={progressPct} className="hidden sm:block w-44 text-right" />
+          </div>
+
+          <div className="mt-3">
+            <XPBar />
+          </div>
         </div>
 
         {/* ── Progress bar ──────────────────────────────────────────────────── */}
@@ -384,16 +502,27 @@ export default function TaskSteps() {
                 onClick={() => handleTap(step.id)}
                 disabled={isLocked}
                 className={[
-                  "w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all duration-300",
-                  "border focus:outline-none",
+                  "relative w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-all duration-300",
+                  "border focus:outline-none overflow-hidden",
                   isCompleted
-                    ? "bg--to-r from-emerald-50 to-green-50 border-emerald-300 shadow-sm shadow-emerald-100"
+                    ? "bg-linear-to-r from-emerald-50 to-green-50 border-emerald-300 shadow-[0_0_22px_rgba(16,185,129,0.18)]"
                     : isActive
-                    ? "bg-linear-to-r from-blue-50 to-indigo-50 border-blue-400 shadow-md shadow-blue-100 scale-[1.015]"
-                    : "bg-white border-blue-100 hover:border-blue-300 hover:shadow-sm",
+                    ? "bg-linear-to-r from-blue-50 to-indigo-50 border-blue-400 shadow-[0_0_28px_rgba(99,102,241,0.25)] scale-[1.015]"
+                    : "bg-white border-blue-100 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100/60 hover:-translate-y-0.5 hover:scale-[1.01]",
                   isLocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
                 ].join(" ")}
               >
+                <XPFloater
+                  amount={xpFloaters[step.id] ?? null}
+                  onDone={() =>
+                    setXpFloaters((prev) => {
+                      if (!(step.id in prev)) return prev
+                      const next = { ...prev }
+                      delete next[step.id]
+                      return next
+                    })
+                  }
+                />
                 <div
                   className={[
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all duration-300",
@@ -501,6 +630,27 @@ export default function TaskSteps() {
                 <div className="text-4xl mb-1">{progressIcon}</div>
                 <h2 className="text-white font-bold text-lg">{progressTitle}</h2>
                 <p className="text-blue-200 text-[12px] mt-1">{progressMsg}</p>
+
+                {/* Neurodivergent-friendly compliment, shown only at 100% */}
+                {progressPct === 100 && (
+                  <div className="mt-4 mx-auto max-w-[20rem] bg-white/15 border border-white/20 backdrop-blur rounded-xl px-4 py-3">
+                    {complimentLoading && !compliment ? (
+                      <div className="flex items-center justify-center gap-2 py-1">
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        <span className="text-[12px] text-blue-100 font-medium">
+                          Finding the right words…
+                        </span>
+                      </div>
+                    ) : (
+                      <p
+                        className="text-[13px] text-white leading-relaxed font-medium"
+                        style={{ fontStyle: "italic" }}
+                      >
+                        “{compliment ?? "Nicely done. The hard part was starting, and you started."}”
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-center pt-5 pb-2">

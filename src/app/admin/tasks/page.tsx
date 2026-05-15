@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabaseAdmin } from "../../../lib/supabase"
 import TiltCard from "../../../components/TiltCard"
+import { sendReminder } from "../../../lib/notifications"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SupabaseUser = {
@@ -96,7 +97,7 @@ export default function TasksPage() {
       const [usersRes, tasksRes] = await Promise.all([
         supabaseAdmin
           .from("users")
-          .select("id, name, email, status, joined_at")
+          .select("*")
           .order("joined_at", { ascending: false }),
         supabaseAdmin
           .from("tasks")
@@ -193,13 +194,28 @@ export default function TasksPage() {
                   onClick={() => setSelectedUserId(u.id)}
                   className="w-full text-left bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-xl hover:shadow-indigo-200/40 transition-shadow duration-300"
                 >
-                  {/* Avatar + name/email */}
-                  <div className="flex items-center gap-3 mb-4">
+                  {/* Avatar + name/email + status badge */}
+                  <div className="flex items-center gap-3 mb-3">
                     <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-linear-to-br from-indigo-500 to-blue-600 text-white font-bold text-sm shadow-md shadow-indigo-200/50">
                       {initials(u.name || u.email)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-800 truncate">{u.name || "Unnamed"}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-semibold text-slate-800 truncate">
+                          {u.name || "Unnamed"}
+                        </p>
+                        {u.status && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                              u.status === "Active"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-500 border border-slate-200"
+                            }`}
+                          >
+                            {u.status.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 truncate">{u.email}</p>
                     </div>
                     <svg
@@ -212,6 +228,17 @@ export default function TasksPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
+
+                  {/* Joined date — from backend */}
+                  {u.joined_at && (
+                    <p className="text-[11px] text-slate-400 mb-3">
+                      Joined {new Date(u.joined_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
 
                   {/* Stat row */}
                   <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
@@ -271,6 +298,32 @@ function UserDetailModal({
   tasks: SupabaseTask[]
   onClose: () => void
 }) {
+  // Track which task is expanded to show its step breakdown.
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null)
+  // Per-task reminder send state: idle | sending | sent | error
+  const [reminderState, setReminderState] = useState<
+    Record<number, "idle" | "sending" | "sent" | "error">
+  >({})
+
+  const handleRemind = async (task: SupabaseTask) => {
+    setReminderState((s) => ({ ...s, [task.id]: "sending" }))
+    const res = await sendReminder({
+      userId: user.id,
+      taskId: task.id,
+      taskTitle: task.title,
+    })
+    setReminderState((s) => ({
+      ...s,
+      [task.id]: res.ok ? "sent" : "error",
+    }))
+    // Auto-reset "sent" / "error" after 3s so admin can resend later.
+    if (res.ok || !res.ok) {
+      window.setTimeout(() => {
+        setReminderState((s) => ({ ...s, [task.id]: "idle" }))
+      }, 3000)
+    }
+  }
+
   // Group tasks by day (newest first)
   const groups = useMemo(() => {
     const buckets = new Map<string, SupabaseTask[]>()
@@ -310,8 +363,30 @@ function UserDetailModal({
             {initials(user.name || user.email)}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-white font-bold text-lg truncate">{user.name || "Unnamed"}</h2>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-white font-bold text-lg truncate">{user.name || "Unnamed"}</h2>
+              {user.status && (
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    user.status === "Active"
+                      ? "bg-emerald-400/30 text-emerald-100 border border-emerald-300/40"
+                      : "bg-white/15 text-white/70 border border-white/20"
+                  }`}
+                >
+                  {user.status}
+                </span>
+              )}
+            </div>
             <p className="text-blue-100 text-xs truncate">{user.email}</p>
+            {user.joined_at && (
+              <p className="text-blue-200/80 text-[10px] mt-0.5">
+                Joined {new Date(user.joined_at).toLocaleDateString(undefined, {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -347,30 +422,120 @@ function UserDetailModal({
                       const { done, total } = parseProgress(t.progress)
                       const pct = total > 0 ? Math.round((done / total) * 100) : 0
                       const status = deriveStatus(t.progress, t.created_at)
+                      const isExpanded = expandedTaskId === t.id
+                      const hasSteps = (t.steps?.length ?? 0) > 0
                       return (
                         <div
                           key={t.id}
-                          className="bg-slate-50 border border-slate-100 rounded-xl p-4"
+                          className="bg-slate-50 border border-slate-100 rounded-xl overflow-hidden"
                         >
-                          <div className="flex items-start justify-between gap-3 mb-2">
-                            <p className="text-sm font-semibold text-slate-800 truncate">
-                              {t.title}
+                          <div
+                            onClick={() =>
+                              hasSteps && setExpandedTaskId(isExpanded ? null : t.id)
+                            }
+                            role={hasSteps ? "button" : undefined}
+                            tabIndex={hasSteps ? 0 : undefined}
+                            className={`p-4 ${
+                              hasSteps ? "cursor-pointer hover:bg-slate-100/60" : ""
+                            } transition-colors`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <p className="text-sm font-semibold text-slate-800 truncate flex-1">
+                                {t.title}
+                              </p>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 ${STATUS_STYLES[status]}`}
+                              >
+                                {status}
+                              </span>
+                              {/* Remind button — only for tasks that aren't done */}
+                              {status !== "Completed" && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (reminderState[t.id] !== "sending" && reminderState[t.id] !== "sent") {
+                                      handleRemind(t)
+                                    }
+                                  }}
+                                  disabled={
+                                    reminderState[t.id] === "sending" ||
+                                    reminderState[t.id] === "sent"
+                                  }
+                                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 transition-colors ${
+                                    reminderState[t.id] === "sent"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : reminderState[t.id] === "error"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                                      : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                                  }`}
+                                >
+                                  {reminderState[t.id] === "sending"
+                                    ? "Sending…"
+                                    : reminderState[t.id] === "sent"
+                                    ? "✓ Sent"
+                                    : reminderState[t.id] === "error"
+                                    ? "✕ Failed"
+                                    : "🔔 Remind"}
+                                </button>
+                              )}
+                              {hasSteps && (
+                                <span
+                                  className={`text-slate-400 text-xs transition-transform duration-200 ${
+                                    isExpanded ? "rotate-90" : ""
+                                  }`}
+                                  aria-hidden
+                                >
+                                  ▶
+                                </span>
+                              )}
+                            </div>
+                            <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden mb-1.5">
+                              <div
+                                className="h-full bg-linear-to-r from-blue-500 to-indigo-500 rounded-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              {done} of {total} steps · {pct}%
                             </p>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 ${STATUS_STYLES[status]}`}
-                            >
-                              {status}
-                            </span>
                           </div>
-                          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden mb-1.5">
-                            <div
-                              className="h-full bg-linear-to-r from-blue-500 to-indigo-500 rounded-full"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <p className="text-[11px] text-slate-500">
-                            {done} of {total} steps · {pct}%
-                          </p>
+
+                          {/* Expanded step list — from backend `steps` JSONB */}
+                          {isExpanded && hasSteps && (
+                            <div className="px-4 pb-4 pt-1 border-t border-slate-200 bg-white">
+                              <ol className="space-y-1.5">
+                                {t.steps!.map((s, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-center gap-2.5 text-[12px]"
+                                  >
+                                    <span
+                                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
+                                        s.completed
+                                          ? "bg-emerald-500 text-white"
+                                          : "bg-slate-200 text-slate-400"
+                                      }`}
+                                    >
+                                      {s.completed ? "✓" : idx + 1}
+                                    </span>
+                                    <span
+                                      className={`flex-1 ${
+                                        s.completed
+                                          ? "line-through text-slate-400"
+                                          : "text-slate-700"
+                                      }`}
+                                    >
+                                      {s.text}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                      {s.duration}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
