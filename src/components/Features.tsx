@@ -38,7 +38,7 @@ const features = [
 
 export default function Features() {
   return (
-    <section className="px-8 pb-10">
+    <section className="px-4 sm:px-6 lg:px-8 pb-10">
       {/* Section header */}
       <ScrollReveal from="up">
         <div className="text-center mb-6">

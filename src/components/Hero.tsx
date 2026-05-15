@@ -6,7 +6,7 @@ import MagneticButton from "./MagneticButton";
 
 export default function Hero() {
   return (
-    <section className="relative grid md:grid-cols-2 gap-6 items-center px-8 py-10 overflow-hidden">
+    <section className="relative grid md:grid-cols-2 gap-6 items-center px-4 sm:px-6 lg:px-8 py-8 sm:py-10 overflow-hidden">
       {/* Background blobs */}
       <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
       <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-blue-100 rounded-full blur-3xl opacity-40 pointer-events-none" />
@@ -67,7 +67,7 @@ export default function Hero() {
       </div>
 
       {/* Right: 3D scene */}
-      <div className="relative flex justify-center items-center h-[420px]">
+      <div className="relative flex justify-center items-center h-[280px] sm:h-[360px] md:h-[420px]">
         <HeroScene />
       </div>
     </section>

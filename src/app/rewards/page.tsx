@@ -258,7 +258,7 @@ export default function RewardsPage() {
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
 
-      <main className="relative flex-1 min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-50 lg:ml-64 px-4 sm:px-6 lg:px-8 py-8 lg:py-12 overflow-hidden">
+      <main className="relative flex-1 min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-50 lg:ml-64 px-4 sm:px-6 lg:px-8 pt-20 lg:pt-12 pb-8 lg:pb-12 overflow-hidden">
         {/* Celebratory Three.js backdrop — warm shapes floating behind the page */}
         <AmbientScene variant="celebrate" opacity={0.45} />
         <div className="relative max-w-4xl mx-auto">

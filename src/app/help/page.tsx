@@ -63,9 +63,9 @@ export default function HelpPage() {
       <Sidebar />
 
       {/* Main Content */}
-      <main className="flex-1 ml-64">
+      <main className="flex-1 lg:ml-64">
 
-        <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-100 p-5 lg:p-10 relative overflow-hidden">
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50/40 to-blue-100 p-4 sm:p-5 lg:p-10 pt-20 lg:pt-10 relative overflow-hidden">
 
           {/* Three.js ambient backdrop */}
           <AmbientScene variant="calm" opacity={0.35} />

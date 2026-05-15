@@ -136,13 +136,13 @@ export default function MyTasksPage() {
   return (
     <div className="flex">
       <Sidebar />
-      <div className="flex-1 ml-64 min-h-screen bg-slate-50 relative overflow-hidden">
+      <div className="flex-1 lg:ml-64 min-h-screen bg-slate-50 relative overflow-hidden">
         <AmbientScene variant="calm" opacity={0.35} />
 
         <div className="pointer-events-none fixed -top-32 -right-32 w-[500px] h-[500px] rounded-full bg-indigo-200/30 blur-[100px]" />
         <div className="pointer-events-none fixed -bottom-20 -left-24 w-[380px] h-[380px] rounded-full bg-emerald-200/20 blur-[80px]" />
 
-        <div className="relative z-10 max-w-2xl mx-auto px-6 py-12">
+        <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12 pt-20 lg:pt-12">
 
           {/* ── Header ── */}
           <div className="flex items-start justify-between mb-8">

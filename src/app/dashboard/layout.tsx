@@ -7,7 +7,7 @@ export default function DashboardLayout({ children }: React.PropsWithChildren<{}
       <Sidebar />
 
       {/* Main Content */}
-      <main className="ml-64 flex-1 p-6">
+      <main className="lg:ml-64 flex-1 p-4 sm:p-6 pt-20 lg:pt-6">
         {children}
       </main>
     </div>

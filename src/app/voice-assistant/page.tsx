@@ -248,10 +248,15 @@ export default function VoiceInput() {
         }
 
         .main-content {
-          margin-left: 256px;
+          margin-left: 0;
           flex: 1;
           display: flex;
           flex-direction: column;
+        }
+        @media (min-width: 1024px) {
+          .main-content {
+            margin-left: 256px;
+          }
         }
 
         /* ── PAGE ── */
@@ -259,7 +264,12 @@ export default function VoiceInput() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 48px 24px 48px;
+          padding: 80px 16px 48px;
+        }
+        @media (min-width: 1024px) {
+          .page {
+            padding: 48px 24px 48px;
+          }
         }
 
         /* ── BADGE ── */

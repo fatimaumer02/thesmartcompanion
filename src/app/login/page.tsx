@@ -95,11 +95,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100">
-      <div className="flex w-[900px] bg-white rounded-3xl shadow-xl overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100 p-4 sm:p-6">
+      <div className="flex w-full max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden">
 
-        {/* Left Side */}
-        <div className="w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
+        {/* Left Side — hidden on mobile, the form fills width there */}
+        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
           <div className="w-72 h-72">
             <HeroScene />
           </div>
@@ -110,7 +110,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right Side */}
-        <div className="w-1/2 p-10 flex flex-col justify-center">
+        <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-10 flex flex-col justify-center">
 
           {/* Toggle */}
           <div className="flex bg-slate-100 rounded-xl p-1 gap-1 mb-8">
