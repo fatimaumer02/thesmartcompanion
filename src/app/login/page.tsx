@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useState } from "react";
 import Button3D from "../../components/Button3D";
 import HeroScene from "../../components/HeroScene";
+import { supabase } from "../../lib/supabase";
+import { syncTasksFromSupabase } from "../../lib/task";
 
 const ADMIN_EMAIL = "admin@smartcompanion.com"
 const ADMIN_PASSWORD = "admin@123"
@@ -14,62 +16,89 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError("")
+    setLoading(true)
 
+    // ── Admin Login ──
     if (mode === "admin") {
       if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
         router.push("/admin/overview")
       } else {
         setError("Invalid admin email or password.")
       }
+      setLoading(false)
       return
     }
 
-    // ── Save user to allUsers on login too ──
-    try {
-      const existing = JSON.parse(localStorage.getItem("allUsers") ?? "[]")
-      const alreadyExists = existing.find(
-        (u: { email: string }) => u.email === email.trim()
-      )
+    // ── User Login via Supabase ──
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
 
-      if (!alreadyExists && email.trim()) {
-        const loginUser = {
-          id: Date.now(),
-          name: email.split("@")[0],
-          email: email.trim(),
-          status: "Active",
-          tasks: 0,
-          joinedAt: new Date().toLocaleDateString(),
-        }
-        existing.push(loginUser)
-        localStorage.setItem("allUsers", JSON.stringify(existing))
+    if (loginError) {
+      console.error("Full login error:", loginError)
+      console.error("Error status:", loginError.status)
+      console.error("Error message:", loginError.message)
+
+      if (loginError.message.toLowerCase().includes("email not confirmed")) {
+        setError("Please confirm your email first. Check your inbox.")
+      } else if (loginError.message.toLowerCase().includes("invalid login")) {
+        setError("Incorrect email or password.")
+      } else {
+        setError(loginError.message)
       }
+      setLoading(false)
+      return
+    }
 
-      // ── Update userProfile ──
-      const existingProfile = JSON.parse(
-        localStorage.getItem("userProfile") ?? "{}"
+    if (data.user) {
+      await syncTasksFromSupabase()
+      localStorage.setItem(
+        "userProfile",
+        JSON.stringify({
+          name: data.user.user_metadata?.name || email.split("@")[0],
+          email: data.user.email,
+        })
       )
-      if (!existingProfile.name) {
-        localStorage.setItem(
-          "userProfile",
-          JSON.stringify({
-            name: email.split("@")[0],
-            email: email.trim(),
-          })
-        )
-      }
-    } catch {}
+    }
 
+    setLoading(false)
     router.push("/profilesetup")
+  }
+
+  // ── Google Login ──
+  const handleGoogleLogin = async () => {
+    setError("")
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) setError(error.message)
+  }
+
+  // ── Apple Login ──
+  const handleAppleLogin = async () => {
+    setError("")
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) setError(error.message)
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100">
       <div className="flex w-[900px] bg-white rounded-3xl shadow-xl overflow-hidden">
 
-        {/* Left Side — Three.js orbiting companion scene */}
+        {/* Left Side */}
         <div className="w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
           <div className="w-72 h-72">
             <HeroScene />
@@ -160,22 +189,28 @@ export default function LoginPage() {
           {/* Error */}
           {error && (
             <p className="mb-4 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-              {error}
+              ⚠️ {error}
             </p>
           )}
 
           {/* Login Button */}
           <Button3D
             onClick={handleLogin}
+            disabled={loading}
             shadowColor={mode === "admin" ? "indigo" : "blue"}
             className={[
-              "w-full text-white py-3 rounded-xl font-bold text-sm mb-4",
+              "w-full text-white py-3 rounded-xl font-bold text-sm mb-4 disabled:opacity-60",
               mode === "admin"
                 ? "bg-gradient-to-r from-indigo-600 to-purple-600"
                 : "bg-gradient-to-r from-blue-500 to-indigo-600"
             ].join(" ")}
           >
-            {mode === "admin" ? "Login as Admin" : "Login"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Please wait...
+              </span>
+            ) : mode === "admin" ? "Login as Admin" : "Login"}
           </Button3D>
 
           {/* Social — user only */}
@@ -185,17 +220,29 @@ export default function LoginPage() {
                 or continue with
               </div>
               <div className="flex gap-3">
-                <button className="w-1/2 border border-slate-200 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all">
+                <button
+                  onClick={handleGoogleLogin}
+                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all"
+                >
                   <Image src="/gooogle.png" alt="Google" width={18} height={18} />
                   Google
                 </button>
-                <button className="w-1/2 border border-slate-200 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all">
-                  <Image src="/applle.png" alt="Apple" width={18} height={18} />
+                <button
+                  onClick={handleAppleLogin}
+                  className="group w-1/2 bg-slate-900 border border-slate-900 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-white hover:border-slate-200 text-sm font-medium text-white hover:text-slate-900 transition-all duration-200"
+                >
+                  <Image
+                    src="/applle.png"
+                    alt="Apple"
+                    width={28}
+                    height={28}
+                    className="invert group-hover:invert-0 transition-all duration-200"
+                  />
                   Apple
                 </button>
               </div>
               <p className="text-center text-sm text-slate-400 mt-5">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <button
                   onClick={() => router.push("/signup")}
                   className="text-blue-500 font-semibold hover:underline"

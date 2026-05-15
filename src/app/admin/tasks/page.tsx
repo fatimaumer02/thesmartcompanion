@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { supabaseAdmin } from "../../../lib/supabase"
 
 type Task = {
   id: number
@@ -11,12 +12,25 @@ type Task = {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("userTasks")
-      if (raw) setTasks(JSON.parse(raw))
-    } catch {}
+    const fetchTasks = async () => {
+      const { data, error } = await supabaseAdmin
+        .from("tasks")
+        .select("*")
+        .order("created_timestamp", { ascending: false })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        setTasks(data ?? [])
+      }
+      setLoading(false)
+    }
+
+    fetchTasks()
   }, [])
 
   return (
@@ -32,7 +46,20 @@ export default function TasksPage() {
         </span>
       </div>
 
-      {tasks.length === 0 ? (
+      {/* Error */}
+      {error && (
+        <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm">
+          ⚠️ Error: {error}
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-12 text-center">
+          <div className="w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">Loading tasks...</p>
+        </div>
+      ) : tasks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-12 text-center">
           <p className="text-slate-400 text-sm">No tasks created yet.</p>
         </div>

@@ -3,28 +3,59 @@
 import { useEffect, useState } from "react"
 import { Users, ClipboardList, TrendingUp, Bell } from "lucide-react"
 import TiltCard from "../../../components/TiltCard"
+import { supabaseAdmin } from "../../../lib/supabase"
 
 type User = {
-  id: number
+  id: string
   name: string
   email: string
   status: string
   tasks: number
-  joinedAt: string
+  joined_at: string
 }
 
 export default function OverviewPage() {
   const [users, setUsers] = useState<User[]>([])
   const [totalTasks, setTotalTasks] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("allUsers")
-      if (raw) setUsers(JSON.parse(raw))
-      const tasksRaw = localStorage.getItem("userTasks")
-      if (tasksRaw) setTotalTasks(JSON.parse(tasksRaw).length)
-    } catch {}
+    const fetchData = async () => {
+      setLoading(true)
+      setError(null)
+
+      const { data: usersData, error: usersError } = await supabaseAdmin
+        .from("users")
+        .select("*")
+        .order("joined_at", { ascending: false })
+
+      if (usersError) {
+        setError(usersError.message)
+      } else if (usersData) {
+        setUsers(usersData)
+      }
+
+      const { count, error: tasksError } = await supabaseAdmin
+        .from("tasks")
+        .select("*", { count: "exact", head: true })
+
+      if (!tasksError) setTotalTasks(count ?? 0)
+
+      setLoading(false)
+    }
+
+    fetchData()
   }, [])
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "—"
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   const stats = [
     {
@@ -70,6 +101,13 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm">
+          ⚠️ Error loading data: {error}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((s, i) => (
@@ -81,7 +119,9 @@ export default function OverviewPage() {
                 {s.icon}
               </div>
               <div>
-                <p className="text-xl font-bold text-slate-800">{s.value}</p>
+                <p className="text-xl font-bold text-slate-800">
+                  {loading ? "—" : s.value}
+                </p>
                 <p className="text-xs text-slate-400 font-medium">{s.label}</p>
               </div>
             </div>
@@ -98,7 +138,12 @@ export default function OverviewPage() {
           </span>
         </div>
 
-        {users.length === 0 ? (
+        {loading ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Loading users...</p>
+          </div>
+        ) : users.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <p className="text-slate-400 text-sm">No users registered yet.</p>
             <p className="text-slate-300 text-xs mt-1">Users will appear here after they sign up.</p>
@@ -114,18 +159,18 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {users.slice(0, 5).map((u, i) => (
-                <tr key={i} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
+              {users.slice(0, 5).map((u) => (
+                <tr key={u.id} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                        {u.name[0].toUpperCase()}
+                        {u.name?.[0]?.toUpperCase() ?? "?"}
                       </div>
                       <span className="text-sm font-semibold text-slate-700">{u.name}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-400">{u.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-400">{u.joinedAt}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400">{formatDate(u.joined_at)}</td>
                   <td className="px-6 py-4">
                     <span className={[
                       "text-xs font-bold px-2.5 py-1 rounded-full",

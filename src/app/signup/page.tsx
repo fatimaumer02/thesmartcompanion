@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { supabase, supabaseAdmin } from "../../lib/supabase";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -10,8 +11,9 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = async () => {
     setError("")
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
@@ -21,48 +23,92 @@ export default function SignupPage() {
       return
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.")
+      return
+    }
+
     if (password !== confirm) {
       setError("Passwords do not match.")
       return
     }
 
+    setLoading(true)
+
     try {
-      // ── Save current user profile (for dashboard greeting) ──
-      localStorage.setItem(
-        "userProfile",
-        JSON.stringify({ name: trimmedName, email: trimmedEmail }),
-      )
+      // ── Step 1: Sign up via Supabase Auth ──
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: { name: trimmedName },
+        },
+      })
 
-      // ── Save to users list (for admin panel) ──
-      const existingRaw = localStorage.getItem("allUsers")
-      const existing = existingRaw ? JSON.parse(existingRaw) : []
-
-      // Check if email already registered
-      const alreadyExists = existing.find(
-        (u: { email: string }) => u.email === trimmedEmail
-      )
-      if (alreadyExists) {
-        setError("This email is already registered.")
+      if (authError) {
+        if (authError.message.toLowerCase().includes("already registered")) {
+          setError("This email is already registered. Please login instead.")
+        } else {
+          setError(authError.message)
+        }
         return
       }
 
-      const newUser = {
-        id: Date.now(),
-        name: trimmedName,
-        email: trimmedEmail,
-        status: "Active",
-        tasks: 0,
-        joinedAt: new Date().toLocaleDateString(),
+      if (data.user) {
+
+        // ── Step 2: Force confirm email using admin client ──
+        const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
+          data.user.id,
+          { email_confirm: true }
+        )
+        if (confirmError) {
+          console.error("Confirm error:", confirmError)
+        }
+
+        // ── Step 3: Save profile to localStorage ──
+        localStorage.setItem(
+          "userProfile",
+          JSON.stringify({ name: trimmedName, email: trimmedEmail }),
+        )
+
+        // ── Step 4: Insert into public.users table ──
+        const { error: dbError } = await supabase.from("users").insert({
+          id: data.user.id,
+          name: trimmedName,
+          email: trimmedEmail,
+          status: "Active",
+          tasks: 0,
+          joined_at: new Date().toISOString(),
+        })
+
+        if (dbError && dbError.code !== "23505") {
+          console.error("DB insert error:", dbError)
+        }
+
+        // ── Step 5: Auto login after signup ──
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
+        })
+
+        if (loginError) {
+          console.error("Auto login error:", loginError)
+          setError("Account created! Please go to login page.")
+          router.push("/login")
+          return
+        }
+
+        if (loginData.user) {
+          router.push("/profilesetup")
+        }
       }
 
-      existing.push(newUser)
-      localStorage.setItem("allUsers", JSON.stringify(existing))
-
-    } catch {
-      // localStorage unavailable
+    } catch (e) {
+      console.error(e)
+      setError("Something went wrong. Please try again.")
+    } finally {
+      setLoading(false)
     }
-
-    router.push("/login")
   };
 
   return (
@@ -101,7 +147,7 @@ export default function SignupPage() {
               <label className="text-sm font-medium">Password</label>
               <input
                 type="password"
-                placeholder="Create password"
+                placeholder="Create password (min 6 chars)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -115,6 +161,7 @@ export default function SignupPage() {
                 placeholder="Confirm password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreateAccount() }}
                 className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
@@ -132,16 +179,22 @@ export default function SignupPage() {
             {/* Error */}
             {error && (
               <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                {error}
+                ⚠️ {error}
               </p>
             )}
 
             <button
               onClick={handleCreateAccount}
+              disabled={loading}
               type="button"
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Account
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Creating account…
+                </span>
+              ) : "Create Account"}
             </button>
           </div>
 
@@ -149,7 +202,7 @@ export default function SignupPage() {
             Already have an account?{" "}
             <button
               onClick={() => router.push("/login")}
-              className="text-blue-500 cursor-pointer"
+              className="text-blue-500 cursor-pointer hover:underline"
             >
               Login
             </button>
