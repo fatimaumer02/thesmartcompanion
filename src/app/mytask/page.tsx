@@ -111,7 +111,7 @@ export default function MyTasksPage() {
         return
       }
 
-      const newTaskObj = saveTask(data.title, data.steps.length, data.steps)
+      const newTaskObj = await saveTask(data.title, data.steps.length, data.steps)
       setTasks((prev) => [...prev, newTaskObj])
 
       sessionStorage.setItem(

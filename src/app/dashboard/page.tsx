@@ -99,7 +99,7 @@ export default function DashboardPage() {
         return
       }
 
-      const newTask = saveTask(data.title, data.steps.length, data.steps)
+      const newTask = await saveTask(data.title, data.steps.length, data.steps)
       setTasks((prev) => [...prev, newTask])
 
       sessionStorage.setItem(
