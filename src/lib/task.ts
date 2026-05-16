@@ -69,20 +69,31 @@ export async function saveTask(
   tasks.push(newTask)
   localStorage.setItem("userTasks", JSON.stringify(tasks))
 
-  // 2. Save to Supabase
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { error } = await supabase.from("tasks").insert({
-      id:                newTask.id,
-      user_id:           user.id,
-      user_email:        user.email,
-      title:             newTask.title,
-      progress:          newTask.progress,
-      created_at:        newTask.createdAt,
-      created_timestamp: newTask.createdTimestamp,
-      steps:             newTask.steps,  // stored as JSONB
-    })
-    if (error) console.error("Supabase task insert error:", error)
+  // 2. Save to Supabase — get user from auth AND from localStorage profile
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Get email from auth user OR localStorage profile as fallback
+    const profileRaw = localStorage.getItem("userProfile")
+    const profile = profileRaw ? JSON.parse(profileRaw) : null
+    const userEmail = user?.email || profile?.email || null
+    const userId = user?.id || null
+
+    if (userEmail) {
+      const { error } = await supabase.from("tasks").insert({
+        id:                newTask.id,
+        user_id:           userId,
+        user_email:        userEmail,   // ← always save email
+        title:             newTask.title,
+        progress:          newTask.progress,
+        created_at:        newTask.createdAt,
+        created_timestamp: newTask.createdTimestamp,
+        steps:             newTask.steps,
+      })
+      if (error) console.error("Supabase task insert error:", error)
+    }
+  } catch (e) {
+    console.error("Supabase save error:", e)
   }
 
   return newTask
@@ -105,40 +116,104 @@ export async function updateTaskProgress(
   localStorage.setItem("userTasks", JSON.stringify(updated))
 
   // 2. Update Supabase
-  const { error } = await supabase
-    .from("tasks")
-    .update({ progress, steps })
-    .eq("id", taskId)
-
-  if (error) console.error("Supabase task update error:", error)
+  try {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ progress, steps })
+      .eq("id", taskId)
+    if (error) console.error("Supabase task update error:", error)
+  } catch (e) {
+    console.error("Supabase update error:", e)
+  }
 }
 
 // ── Sync from Supabase → localStorage (call after login) ─────────────────────
 export async function syncTasksFromSupabase(): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
 
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_timestamp", { ascending: false })
+    // Get email from auth OR localStorage profile
+    const profileRaw = localStorage.getItem("userProfile")
+    const profile = profileRaw ? JSON.parse(profileRaw) : null
+    const userEmail = user?.email || profile?.email || null
 
-  if (error) {
-    console.error("Supabase sync error:", error)
-    return
+    if (!userEmail) return
+
+    // ── Fetch by user_id if available, else by user_email ──
+    let query = supabase
+      .from("tasks")
+      .select("*")
+      .order("created_timestamp", { ascending: false })
+
+    if (user?.id) {
+      // Try by user_id first
+      const { data: byId, error: idError } = await query.eq("user_id", user.id)
+      if (!idError && byId && byId.length > 0) {
+        const mapped: Task[] = byId.map((row) => ({
+          id:               row.id,
+          title:            row.title,
+          progress:         row.progress,
+          createdAt:        row.created_at,
+          createdTimestamp: row.created_timestamp,
+          steps:            row.steps ?? [],
+        }))
+        localStorage.setItem("userTasks", JSON.stringify(mapped))
+        return
+      }
+    }
+
+    // Fallback: fetch by user_email
+    const { data: byEmail, error: emailError } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_email", userEmail)
+      .order("created_timestamp", { ascending: false })
+
+    if (emailError) {
+      console.error("Supabase sync error:", emailError)
+      return
+    }
+
+    if (byEmail && byEmail.length > 0) {
+      const mapped: Task[] = byEmail.map((row) => ({
+        id:               row.id,
+        title:            row.title,
+        progress:         row.progress,
+        createdAt:        row.created_at,
+        createdTimestamp: row.created_timestamp,
+        steps:            row.steps ?? [],
+      }))
+      localStorage.setItem("userTasks", JSON.stringify(mapped))
+    }
+  } catch (e) {
+    console.error("Supabase sync error:", e)
   }
+}
 
-  if (data && data.length > 0) {
-    // Map Supabase column names back to local Task shape
-    const mapped: Task[] = data.map((row) => ({
-      id:               row.id,
-      title:            row.title,
-      progress:         row.progress,
-      createdAt:        row.created_at,
-      createdTimestamp: row.created_timestamp,
-      steps:            row.steps ?? [],
-    }))
-    localStorage.setItem("userTasks", JSON.stringify(mapped))
+// ── Get all tasks for admin (all users) ───────────────────────────────────────
+export async function getAllTasksForAdmin(): Promise<{
+  user_email: string
+  user_id: string
+  id: number
+  title: string
+  progress: string
+  created_at: string
+  steps: { text: string; duration: string; completed: boolean }[]
+}[]> {
+  try {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("created_timestamp", { ascending: false })
+
+    if (error) {
+      console.error("Supabase getAllTasks error:", error)
+      return []
+    }
+
+    return data ?? []
+  } catch (e) {
+    console.error("getAllTasksForAdmin error:", e)
+    return []
   }
 }
