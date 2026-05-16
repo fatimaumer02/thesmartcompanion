@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  BookOpen,
 } from "lucide-react"
 
 export default function AdminLayout({
@@ -23,10 +24,11 @@ export default function AdminLayout({
   const [open, setOpen] = useState(false)
 
   const navItems = [
-    { id: "overview", label: "Overview", icon: <BarChart2 size={18} />, href: "/admin/overview" },
-    { id: "users",    label: "Users",    icon: <Users size={18} />,     href: "/admin/users"    },
-    { id: "tasks",    label: "Tasks",    icon: <ClipboardList size={18} />, href: "/admin/tasks" },
-    { id: "settings", label: "Settings", icon: <Settings size={18} />,  href: "/admin/settings" },
+    { id: "overview", label: "Overview", icon: <BarChart2 size={18} />,     href: "/admin/overview" },
+    { id: "users",    label: "Users",    icon: <Users size={18} />,          href: "/admin/users"    },
+    { id: "tasks",    label: "Tasks",    icon: <ClipboardList size={18} />,  href: "/admin/tasks"    },
+    { id: "blogs",    label: "Blogs",    icon: <BookOpen size={18} />,       href: "/admin/blogs"    }, // ← ADDED
+    { id: "settings", label: "Settings", icon: <Settings size={18} />,      href: "/admin/settings" },
   ]
 
   useEffect(() => {

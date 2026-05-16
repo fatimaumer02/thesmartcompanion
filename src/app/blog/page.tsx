@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../../components/Navbar";
+import { supabase } from "../../lib/supabase";
 
 const featured = {
   category: "Product",
@@ -16,6 +17,7 @@ const featured = {
 };
 
 type Post = {
+  id?: number;
   category: string;
   title: string;
   excerpt: string;
@@ -24,9 +26,10 @@ type Post = {
   readTime: string;
   tint: string;
   accent: string;
+  isSupabase?: boolean;
 };
 
-const posts: Post[] = [
+const staticPosts: Post[] = [
   {
     category: "Research",
     title: "Task paralysis isn't laziness — it's a working memory tax",
@@ -97,19 +100,66 @@ const posts: Post[] = [
 
 const tags = ["All", "Product", "Research", "Design", "Stories", "Engineering"];
 
+const SUPABASE_TINTS = [
+  { tint: "bg-indigo-50", accent: "text-indigo-600" },
+  { tint: "bg-teal-50",   accent: "text-teal-600"   },
+  { tint: "bg-rose-50",   accent: "text-rose-600"   },
+  { tint: "bg-orange-50", accent: "text-orange-600" },
+];
+
 export default function BlogPage() {
-  const [activeTag, setActiveTag] = useState("All");
+  const [activeTag, setActiveTag]         = useState("All");
+  const [supabasePosts, setSupabasePosts] = useState<Post[]>([]);
+
+  // ── Fetch published blogs from Supabase ──
+  useEffect(() => {
+    const fetchBlogs = async () => {
+      const { data } = await supabase
+        .from("blogs")
+        .select("id, title, excerpt, author, created_at")
+        .eq("published", true)
+        .order("created_at", { ascending: false });
+
+      if (!data) return;
+
+      const mapped: Post[] = data.map((b, i) => ({
+        id:         b.id,
+        category:   "Product",
+        title:      b.title,
+        excerpt:    b.excerpt ?? "",
+        author:     b.author ?? "Admin",
+        date:       new Date(b.created_at).toLocaleDateString(undefined, {
+          month: "short", day: "numeric", year: "numeric",
+        }),
+        readTime:   "3 min read",
+        isSupabase: true,
+        ...SUPABASE_TINTS[i % SUPABASE_TINTS.length],
+      }));
+
+      setSupabasePosts(mapped);
+    };
+    fetchBlogs();
+  }, []);
+
+  // ── Supabase posts first, then static ──
+  const allPosts = useMemo(
+    () => [...supabasePosts, ...staticPosts],
+    [supabasePosts]
+  );
 
   const visiblePosts = useMemo(
-    () => (activeTag === "All" ? posts : posts.filter((p) => p.category === activeTag)),
-    [activeTag]
+    () =>
+      activeTag === "All"
+        ? allPosts
+        : allPosts.filter((p) => p.category === activeTag),
+    [activeTag, allPosts]
   );
 
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
 
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="relative px-4 sm:px-6 lg:px-8 py-10 sm:py-12 md:py-16 overflow-hidden">
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
 
@@ -123,13 +173,13 @@ export default function BlogPage() {
             <span className="text-blue-600">productivity</span>
           </h1>
           <p className="text-gray-500 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
-            Research, design notes, and user stories from the team building tools for
-            neurodivergent minds.
+            Research, design notes, and user stories from the team building
+            tools for neurodivergent minds.
           </p>
         </div>
       </section>
 
-      {/* Tags */}
+      {/* ── Tags ── */}
       <section className="pb-8">
         <div
           className="max-w-5xl mx-auto overflow-x-auto sm:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -161,13 +211,13 @@ export default function BlogPage() {
         </div>
       </section>
 
-      {/* Featured (hidden when filtering, since it's curated for "All") */}
+      {/* ── Featured ── */}
       {activeTag === "All" && (
         <section className="px-4 sm:px-6 lg:px-8 pb-10 sm:pb-12">
           <div className="max-w-5xl mx-auto">
-            <div className="relative group rounded-3xl overflow-hidden border border-blue-100 bg-linear-to-br from-blue-50 via-white to-white cursor-pointer">
+            <div className="relative group rounded-3xl overflow-hidden border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white cursor-pointer">
               <div
-                className={`absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r ${featured.accent}`}
+                className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${featured.accent}`}
               />
               <div className="grid md:grid-cols-2 gap-6 md:gap-8 p-6 sm:p-8 md:p-10 items-center">
                 <div>
@@ -181,7 +231,9 @@ export default function BlogPage() {
                     {featured.excerpt}
                   </p>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                    <span className="font-semibold text-gray-700">{featured.author}</span>
+                    <span className="font-semibold text-gray-700">
+                      {featured.author}
+                    </span>
                     <span aria-hidden>·</span>
                     <span>{featured.date}</span>
                     <span aria-hidden>·</span>
@@ -189,7 +241,7 @@ export default function BlogPage() {
                   </div>
                 </div>
                 <div className="hidden md:flex items-center justify-center">
-                  <div className="w-full aspect-square max-w-xs rounded-2xl bg-linear-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center text-7xl">
+                  <div className="w-full aspect-square max-w-xs rounded-2xl bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center text-7xl">
                     ✍️
                   </div>
                 </div>
@@ -199,7 +251,7 @@ export default function BlogPage() {
         </section>
       )}
 
-      {/* Post grid */}
+      {/* ── Post Grid ── */}
       <section className="px-4 sm:px-6 lg:px-8 pb-16">
         <div className="max-w-6xl mx-auto">
           {visiblePosts.length === 0 ? (
@@ -210,8 +262,15 @@ export default function BlogPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 items-stretch">
               {visiblePosts.map((p, i) => (
                 <article
-                  key={i}
-                  className="group bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col h-full min-w-0"
+                  key={p.isSupabase ? `supabase-${p.id}` : `static-${i}`}
+                  onClick={() =>
+                    p.isSupabase && p.id
+                      ? (window.location.href = `/blog/${p.id}`)
+                      : undefined
+                  }
+                  className={`group bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col h-full min-w-0 ${
+                    p.isSupabase ? "cursor-pointer" : "cursor-default"
+                  }`}
                 >
                   <span
                     className={`self-start inline-block px-2.5 py-1 rounded-full ${p.tint} ${p.accent} text-[10px] font-bold uppercase tracking-widest mb-3`}
@@ -233,6 +292,15 @@ export default function BlogPage() {
                     <span aria-hidden>·</span>
                     <span>{p.readTime}</span>
                   </div>
+
+                  {/* Read more — only for supabase posts */}
+                  {p.isSupabase && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <span className="text-xs font-bold text-indigo-600 group-hover:text-indigo-800 transition-colors">
+                        Read more →
+                      </span>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -240,16 +308,16 @@ export default function BlogPage() {
         </div>
       </section>
 
-      {/* Newsletter */}
+      {/* ── Newsletter ── */}
       <section className="px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="max-w-2xl mx-auto bg-linear-to-br from-blue-50 to-white border border-blue-100 rounded-3xl p-6 sm:p-10 text-center">
+        <div className="max-w-2xl mx-auto bg-gradient-to-br from-blue-50 to-white border border-blue-100 rounded-3xl p-6 sm:p-10 text-center">
           <h2 className="text-2xl font-extrabold text-gray-900 mb-2 tracking-tight">
             Get one good idea a week
           </h2>
           <p className="text-gray-500 text-sm mb-6">
             Quiet, useful, and never more than five minutes to read.
           </p>
-          <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
             <input
               type="email"
               placeholder="you@example.com"
@@ -257,11 +325,11 @@ export default function BlogPage() {
             />
             <button
               type="button"
-              className="px-6 py-2.5 rounded-full bg-linear-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5 transition-all duration-200"
+              className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold shadow-md shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5 transition-all duration-200"
             >
               Subscribe
             </button>
-          </form>
+          </div>
           <p className="text-[11px] text-gray-400 mt-4">
             No spam. Unsubscribe in one click.{" "}
             <Link href="/about" className="text-blue-600 hover:underline">

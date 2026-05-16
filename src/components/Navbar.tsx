@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShieldCheck } from "lucide-react";
 
 const links = [
   { label: "Home", href: "/" },
@@ -26,12 +26,14 @@ export default function Navbar() {
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-md shadow-blue-200">
-            <span className="text-white font-bold text-sm">SC</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck size={20} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm truncate">Smart Companion</p>
+            </div>
           </div>
-          <span className="font-bold text-base tracking-tight text-gray-900">
-            Smart<span className="text-blue-600">Companion</span>
-          </span>
         </Link>
 
         {/* Desktop nav links */}
