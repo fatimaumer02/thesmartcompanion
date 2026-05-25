@@ -40,10 +40,6 @@ export default function LoginPage() {
     })
 
     if (loginError) {
-      console.error("Full login error:", loginError)
-      console.error("Error status:", loginError.status)
-      console.error("Error message:", loginError.message)
-
       if (loginError.message.toLowerCase().includes("email not confirmed")) {
         setError("Please confirm your email first. Check your inbox.")
       } else if (loginError.message.toLowerCase().includes("invalid login")) {
@@ -60,7 +56,9 @@ export default function LoginPage() {
       localStorage.setItem(
         "userProfile",
         JSON.stringify({
-          name: data.user.user_metadata?.name || email.split("@")[0],
+          name: data.user.user_metadata?.name ||
+                data.user.user_metadata?.full_name ||
+                email.split("@")[0],
           email: data.user.email,
         })
       )
@@ -73,39 +71,33 @@ export default function LoginPage() {
   // ── Google Login ──
   const handleGoogleLogin = async () => {
     setError("")
+    setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-    if (error) setError(error.message)
-  }
-
-  // ── Apple Login ──
-  const handleAppleLogin = async () => {
-    setError("")
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) setError(error.message)
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100 p-4 sm:p-6">
       <div className="flex w-full max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden">
 
-        {/* Left Side — hidden on mobile, the form fills width there */}
+        {/* Left Side */}
         <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 flex-col items-center justify-center p-10 gap-6 relative overflow-hidden">
           <div className="w-72 h-72">
             <HeroScene />
           </div>
           <div className="text-center relative z-10">
             <h2 className="text-white text-2xl font-bold">Smart Companion</h2>
-            <p className="text-blue-200 text-sm mt-1">Your neuro-inclusive AI assistant</p>
+            <p className="text-blue-200 text-sm mt-1">
+              Your neuro-inclusive AI assistant
+            </p>
           </div>
         </div>
 
@@ -115,7 +107,12 @@ export default function LoginPage() {
           {/* Toggle */}
           <div className="flex bg-slate-100 rounded-xl p-1 gap-1 mb-8">
             <button
-              onClick={() => { setMode("user"); setError(""); setEmail(""); setPassword("") }}
+              onClick={() => {
+                setMode("user")
+                setError("")
+                setEmail("")
+                setPassword("")
+              }}
               className={[
                 "flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-200",
                 mode === "user"
@@ -126,7 +123,12 @@ export default function LoginPage() {
               User Login
             </button>
             <button
-              onClick={() => { setMode("admin"); setError(""); setEmail(""); setPassword("") }}
+              onClick={() => {
+                setMode("admin")
+                setError("")
+                setEmail("")
+                setPassword("")
+              }}
               className={[
                 "flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-200",
                 mode === "admin"
@@ -213,34 +215,28 @@ export default function LoginPage() {
             ) : mode === "admin" ? "Login as Admin" : "Login"}
           </Button3D>
 
-          {/* Social — user only */}
+          {/* Google — user only, full width */}
           {mode === "user" && (
             <>
               <div className="text-center text-slate-400 my-3 text-xs">
                 or continue with
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleGoogleLogin}
-                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all"
-                >
-                  <Image src="/gooogle.png" alt="Google" width={18} height={18} />
-                  Google
-                </button>
-                <button
-                  onClick={handleAppleLogin}
-                  className="group w-1/2 bg-slate-900 border border-slate-900 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-white hover:border-slate-200 text-sm font-medium text-white hover:text-slate-900 transition-all duration-200"
-                >
-                  <Image
-                    src="/applle.png"
-                    alt="Apple"
-                    width={28}
-                    height={28}
-                    className="invert group-hover:invert-0 transition-all duration-200"
-                  />
-                  Apple
-                </button>
-              </div>
+
+              {/* Google Button — full width */}
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full border border-slate-200 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Image
+                  src="/gooogle.png"
+                  alt="Google"
+                  width={18}
+                  height={18}
+                />
+                Continue with Google
+              </button>
+
               <p className="text-center text-sm text-slate-400 mt-5">
                 Don&apos;t have an account?{" "}
                 <button
