@@ -52,7 +52,7 @@ export default function AuthCallbackPage() {
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-50">
       <div className="flex flex-col items-center gap-4">
         <div className="w-8 h-8 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
         <p className="text-slate-400 text-sm">Signing you in...</p>

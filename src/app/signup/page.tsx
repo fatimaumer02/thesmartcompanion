@@ -2,32 +2,33 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { supabase, supabaseAdmin } from "../../lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
+import { supabase } from "../../lib/supabase";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [name, setName]       = useState("");
+  const [email, setEmail]     = useState("");
+  const [password, setPassword]     = useState("");
+  const [confirm, setConfirm]       = useState("");
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [showPassword, setShowPassword]   = useState(false);
+  const [showConfirm, setShowConfirm]     = useState(false);
 
   const handleCreateAccount = async () => {
     setError("")
-    const trimmedName = name.trim();
+    const trimmedName  = name.trim();
     const trimmedEmail = email.trim();
 
     if (!trimmedName || !trimmedEmail || !password) {
       setError("Please fill in all fields.")
       return
     }
-
     if (password.length < 6) {
       setError("Password must be at least 6 characters.")
       return
     }
-
     if (password !== confirm) {
       setError("Passwords do not match.")
       return
@@ -55,29 +56,19 @@ export default function SignupPage() {
       }
 
       if (data.user) {
-
-        // ── Step 2: Force confirm email using admin client ──
-        const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
-          data.user.id,
-          { email_confirm: true }
-        )
-        if (confirmError) {
-          console.error("Confirm error:", confirmError)
-        }
-
-        // ── Step 3: Save profile to localStorage ──
+        // ── Step 2: Save profile to localStorage ──
         localStorage.setItem(
           "userProfile",
           JSON.stringify({ name: trimmedName, email: trimmedEmail }),
         )
 
-        // ── Step 4: Insert into public.users table ──
+        // ── Step 3: Insert into users table ──
         const { error: dbError } = await supabase.from("users").insert({
-          id: data.user.id,
-          name: trimmedName,
-          email: trimmedEmail,
-          status: "Active",
-          tasks: 0,
+          id:        data.user.id,
+          name:      trimmedName,
+          email:     trimmedEmail,
+          status:    "Active",
+          tasks:     0,
           joined_at: new Date().toISOString(),
         })
 
@@ -85,21 +76,21 @@ export default function SignupPage() {
           console.error("DB insert error:", dbError)
         }
 
-        // ── Step 5: Auto login after signup ──
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password,
-        })
+        // ── Step 4: Auto login after signup ──
+        const { data: loginData, error: loginError } =
+          await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password,
+          })
 
         if (loginError) {
-          console.error("Auto login error:", loginError)
           setError("Account created! Please go to login page.")
           router.push("/login")
           return
         }
 
         if (loginData.user) {
-          router.push("/profilesetup")
+          router.push("/login")
         }
       }
 
@@ -118,9 +109,11 @@ export default function SignupPage() {
         {/* LEFT SIDE FORM */}
         <div className="w-full md:w-1/2 p-8">
           <h2 className="text-2xl font-bold mb-2">Create Your Account</h2>
-          <p className="text-gray-500 mb-6">Let's get you started!</p>
+          <p className="text-gray-500 mb-6">Let&apos;s get you started!</p>
 
           <div className="space-y-4">
+
+            {/* Name */}
             <div>
               <label className="text-sm font-medium">Full name</label>
               <input
@@ -132,6 +125,7 @@ export default function SignupPage() {
               />
             </div>
 
+            {/* Email */}
             <div>
               <label className="text-sm font-medium">Email address</label>
               <input
@@ -143,34 +137,55 @@ export default function SignupPage() {
               />
             </div>
 
+            {/* Password */}
             <div>
               <label className="text-sm font-medium">Password</label>
-              <input
-                type="password"
-                placeholder="Create password (min 6 chars)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create password (min 6 chars)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 pr-11 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
+            {/* Confirm Password */}
             <div>
               <label className="text-sm font-medium">Confirm Password</label>
-              <input
-                type="password"
-                placeholder="Confirm password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleCreateAccount() }}
-                className="w-full mt-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <div className="relative mt-1">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Confirm password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleCreateAccount() }}
+                  className="w-full p-3 pr-11 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
+            {/* Terms */}
             <div className="flex items-center gap-2 text-sm">
               <input type="checkbox" />
               <span>
                 I agree to the{" "}
-                <span className="text-blue-600 cursor-pointer">
+                <span className="text-blue-600 cursor-pointer hover:underline">
                   Terms & Privacy Policy
                 </span>
               </span>
@@ -183,6 +198,7 @@ export default function SignupPage() {
               </p>
             )}
 
+            {/* Submit */}
             <button
               onClick={handleCreateAccount}
               disabled={loading}
