@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Button3D from "../../components/Button3D";
 import TiltCard from "../../components/TiltCard";
 import ProfileSetupScene from "../../components/ProfileSetupScene";
+import { supabase } from "../../lib/supabase";
 
 const neurotypes    = ["ADHD", "Dyslexia", "Autism", "Other"];
 const supportLevels = ["Very Small", "Normal", "Detailed"];
@@ -166,13 +167,63 @@ function SectionCard({
 
 export default function ProfileSetup() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true) // ← ADDED
 
-  // ── CHANGED: single string (was string[]) ─────────────────────────────────
+  // ── ADDED: Protection — redirect existing users to dashboard ──
+  useEffect(() => {
+    const checkIfAlreadySetup = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          // Not logged in → go to login
+          router.push("/login")
+          return
+        }
+
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", user.id)
+          .single()
+
+        if (existingUser?.name) {
+          // Already has profile → skip to dashboard
+          router.push("/dashboard")
+          return
+        }
+
+        // New user → show profile setup
+        setChecking(false)
+      } catch {
+        setChecking(false)
+      }
+    }
+
+    checkIfAlreadySetup()
+  }, [])
+
+  // ── ADDED: Show loading while checking ──
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-950 via-indigo-950/80 to-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return <ProfileSetupContent router={router} />
+}
+
+// ── MOVED: main content into separate component ──
+function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> }) {
   const [selectedNeuro, setSelectedNeuro] = useState<string>("");
   const [support, setSupport] = useState("");
   const [reading, setReading] = useState("");
 
-  // ── ADDED: apply font to page on reading change ───────────────────────────
   useEffect(() => {
     if (!reading) return;
     document.documentElement.style.fontFamily = READING_FONTS[reading] ?? "";
@@ -189,7 +240,6 @@ export default function ProfileSetup() {
   const progressPct    = (completedCount / totalSections) * 100;
 
   const handleContinue = () => {
-    // ── ADDED: stepSizeInstruction saved for AI ───────────────────────────
     const stepSizeInstruction = {
       "Very Small": "Break the task into 8 to 9 very small micro-steps. Each step should be extremely simple and take less than 2 minutes.",
       "Normal":     "Break the task into 4 to 6 balanced steps. Each step should be clear and straightforward.",
@@ -199,7 +249,7 @@ export default function ProfileSetup() {
     localStorage.setItem(
       "preferences",
       JSON.stringify({
-        neurotypes:          [selectedNeuro], // keep array for API compatibility
+        neurotypes:          [selectedNeuro],
         support,
         stepSizeInstruction,
         reading,
@@ -270,7 +320,7 @@ export default function ProfileSetup() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 mb-8 lg:mb-10">
 
-            {/* Card 1 — Neurotype: SINGLE select */}
+            {/* Card 1 — Neurotype */}
             <SectionCard
               eyebrow="🧠 Neurotype"
               title="Which best describes you?"
@@ -291,7 +341,7 @@ export default function ProfileSetup() {
               <p className="text-[11px] text-slate-400 mt-3">Select one that fits best.</p>
             </SectionCard>
 
-            {/* Card 2 — Step Size: description preview */}
+            {/* Card 2 — Step Size */}
             <SectionCard
               eyebrow="⚡ Step Size"
               title="How do you prefer your steps?"
@@ -318,7 +368,7 @@ export default function ProfileSetup() {
               )}
             </SectionCard>
 
-            {/* Card 3 — Reading Style: font preview per pill */}
+            {/* Card 3 — Reading Style */}
             <SectionCard
               eyebrow="📖 Reading"
               title="Pick a reading style"

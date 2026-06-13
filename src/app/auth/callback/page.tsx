@@ -22,30 +22,41 @@ export default function AuthCallbackPage() {
       localStorage.setItem(
         "userProfile",
         JSON.stringify({
-          name:  user.user_metadata?.full_name || user.email?.split("@")[0],
+          name:  user.user_metadata?.full_name ||
+                 user.user_metadata?.name ||
+                 user.email?.split("@")[0],
           email: user.email,
         })
       )
 
-      // ── Save to users table in Supabase if not already there ──
+      // ── Check if user already exists in users table ──
       const { data: existing } = await supabase
         .from("users")
-        .select("id")
+        .select("id, name")
         .eq("id", user.id)
         .single()
 
       if (!existing) {
+        // ── New user → insert into users table ──
         await supabase.from("users").insert({
           id:        user.id,
-          name:      user.user_metadata?.full_name || user.email?.split("@")[0],
+          name:      user.user_metadata?.full_name ||
+                     user.user_metadata?.name ||
+                     user.email?.split("@")[0],
           email:     user.email,
           status:    "Active",
           tasks:     0,
           joined_at: new Date().toLocaleDateString(),
         })
+        // ── New user → go to profile setup ──
+        router.push("/profilesetup")
+      } else if (!existing.name) {
+        // ── User exists but no name → go to profile setup ──
+        router.push("/profilesetup")
+      } else {
+        // ── Existing user with profile → go to dashboard ──
+        router.push("/dashboard")
       }
-
-      router.push("/profilesetup")
     }
 
     handleCallback()

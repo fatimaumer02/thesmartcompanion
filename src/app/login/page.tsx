@@ -71,6 +71,24 @@ export default function LoginPage() {
           email: data.user.email,
         })
       )
+
+      // ── Check if user already completed profile setup ──
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", data.user.id)
+        .single()
+
+      setLoading(false)
+
+      if (existingUser?.name) {
+        // ── Already has profile → go to dashboard ──
+        router.push("/dashboard")
+      } else {
+        // ── No profile yet → go to profile setup ──
+        router.push("/profilesetup")
+      }
+      return
     }
 
     setLoading(false)
@@ -133,7 +151,7 @@ export default function LoginPage() {
         {/* Right Side */}
         <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-10 flex flex-col justify-center">
 
-          {/* ── Forgot Password Modal ── */}
+          {/* ── Forgot Password View ── */}
           {showForgot ? (
             <div>
               <button
