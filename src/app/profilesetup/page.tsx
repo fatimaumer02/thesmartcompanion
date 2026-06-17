@@ -165,35 +165,34 @@ function SectionCard({
   );
 }
 
+// ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProfileSetup() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true) // ← ADDED
+  const [checking, setChecking] = useState(true)
 
-  // ── ADDED: Protection — redirect existing users to dashboard ──
   useEffect(() => {
     const checkIfAlreadySetup = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) {
-          // Not logged in → go to login
           router.push("/login")
           return
         }
 
         const { data: existingUser } = await supabase
           .from("users")
-          .select("name")
+          .select("profile_completed")
           .eq("id", user.id)
           .single()
 
-        if (existingUser?.name) {
-          // Already has profile → skip to dashboard
+        if (existingUser?.profile_completed === true) {
+          // Already completed setup → go to dashboard
           router.push("/dashboard")
           return
         }
 
-        // New user → show profile setup
+        // New user or not completed → show profile setup
         setChecking(false)
       } catch {
         setChecking(false)
@@ -203,7 +202,6 @@ export default function ProfileSetup() {
     checkIfAlreadySetup()
   }, [])
 
-  // ── ADDED: Show loading while checking ──
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-950 via-indigo-950/80 to-slate-950">
@@ -218,11 +216,12 @@ export default function ProfileSetup() {
   return <ProfileSetupContent router={router} />
 }
 
-// ── MOVED: main content into separate component ──
+// ─── Profile Setup Content ────────────────────────────────────────────────────
 function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> }) {
   const [selectedNeuro, setSelectedNeuro] = useState<string>("");
   const [support, setSupport] = useState("");
   const [reading, setReading] = useState("");
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!reading) return;
@@ -239,13 +238,17 @@ function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> 
   const allComplete    = completedCount === totalSections;
   const progressPct    = (completedCount / totalSections) * 100;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (!allComplete || saving) return
+    setSaving(true)
+
     const stepSizeInstruction = {
       "Very Small": "Break the task into 8 to 9 very small micro-steps. Each step should be extremely simple and take less than 2 minutes.",
       "Normal":     "Break the task into 4 to 6 balanced steps. Each step should be clear and straightforward.",
       "Detailed":   "Break the task into detailed steps with thorough instructions and context for each action. Include up to 10 steps if needed.",
     }[support] ?? "";
 
+    // Save preferences to localStorage
     localStorage.setItem(
       "preferences",
       JSON.stringify({
@@ -256,6 +259,25 @@ function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> 
         readingFont:         READING_FONTS[reading] ?? "",
       })
     );
+
+    // ── Save to Supabase and mark profile_completed = true ──
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from("users")
+          .update({
+            name: user.user_metadata?.name || user.email?.split("@")[0] || "User",
+            status: "Active",
+            profile_completed: true,
+          })
+          .eq("id", user.id)
+      }
+    } catch {
+      // Silent fail — still navigate to dashboard
+    }
+
+    setSaving(false)
     router.push("/dashboard");
   };
 
@@ -410,7 +432,7 @@ function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> 
             )}
             <Button3D
               onClick={handleContinue}
-              disabled={!allComplete}
+              disabled={!allComplete || saving}
               shadowColor={allComplete ? "indigo" : "slate"}
               style={
                 allComplete
@@ -423,7 +445,12 @@ function ProfileSetupContent({ router }: { router: ReturnType<typeof useRouter> 
                   : "bg-white/5 text-slate-400 border border-white/10 cursor-not-allowed backdrop-blur-md"
               }`}
             >
-              {allComplete ? (
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Saving...
+                </span>
+              ) : allComplete ? (
                 <span className="inline-flex items-center gap-2">
                   <span>Save & Continue</span>
                   <span className="text-base">→</span>

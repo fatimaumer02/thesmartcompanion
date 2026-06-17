@@ -35,6 +35,14 @@ function getStats(tasks: Task[]) {
   return { overallPct, completed, inProgress }
 }
 
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return "👋 Good morning"
+  if (hour >= 12 && hour < 17) return "☀️ Good afternoon"
+  if (hour >= 17 && hour < 21) return "🌇 Good evening"
+  return "🌙 Good night"
+}
+
 export default function MyTasksPage() {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -147,7 +155,7 @@ export default function MyTasksPage() {
           {/* ── Header ── */}
           <div className="flex items-start justify-between mb-8">
             <div>
-              <p className="text-sm text-slate-400 font-medium mb-1">👋 Good morning</p>
+              <p className="text-sm text-slate-400 font-medium mb-1">{getGreeting()}</p>
               <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-tight">
                 My Tasks
               </h1>
