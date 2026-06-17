@@ -19,7 +19,7 @@ import MotivationalMessage from "./game/MotivationalMessage"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = {
-  id: number
+  id: string
   text: string
   duration: string
   completed: boolean
@@ -48,30 +48,38 @@ function loadFromSession(): { title: string; steps: Step[]; taskId?: number } | 
       title?: string
       steps?: { text: string; duration: string }[]
       taskId?: number
+      completedIds?: (string | number)[]
     }
     if (!parsed.steps?.length || !parsed.title) return null
 
-    let completedIds: number[] = []
+    let completedIds: string[] = []
     if (parsed.taskId) {
       const tasks = JSON.parse(localStorage.getItem("userTasks") ?? "[]")
       const savedTask = tasks.find((t: { id: number }) => t.id === parsed.taskId)
       if (savedTask?.steps) {
         completedIds = savedTask.steps
-          .map((s: { completed: boolean }, i: number) => s.completed ? i + 1 : null)
-          .filter(Boolean)
+          .map((s: { completed: boolean }, i: number) => (s.completed ? String(i + 1) : null))
+          .filter(Boolean) as string[]
       }
     }
+
+    const sessionCompletedIds = Array.isArray(parsed.completedIds)
+      ? parsed.completedIds.map(String)
+      : []
 
     return {
       title: parsed.title,
       taskId: parsed.taskId,
-      steps: parsed.steps.map((s, i) => ({
-        id: i + 1,
-        text: s.text,
-        duration: s.duration,
-        completed: completedIds.includes(i + 1),
-        startedAt: null,
-      })),
+      steps: parsed.steps.map((s, i) => {
+        const id = String(i + 1)
+        return {
+          id,
+          text: s.text,
+          duration: s.duration,
+          completed: sessionCompletedIds.includes(id) || completedIds.includes(id),
+          startedAt: null,
+        }
+      }),
     }
   } catch {
     return null
@@ -82,6 +90,14 @@ function fmtTime(secs: number) {
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+function isTopLevelStepId(id: string): boolean {
+  return !id.includes(".")
+}
+
+function formatStepLabel(id: string): string {
+  return id
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -114,7 +130,7 @@ export default function TaskSteps() {
   const taskId = session?.taskId
   const [steps, setSteps] = useState<Step[]>(session?.steps ?? [])
 
-  const [activeStep, setActiveStep] = useState<number | null>(null)
+  const [activeStep, setActiveStep] = useState<string | null>(null)
   const [firstCompletedAt, setFirstCompletedAt] = useState<number | null>(null)
   const [unlocked, setUnlocked] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
@@ -132,7 +148,7 @@ export default function TaskSteps() {
 
   const [confettiActive, setConfettiActive] = useState(false)
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([])
-  const [xpFloaters, setXpFloaters] = useState<Record<number, number>>({})
+  const [xpFloaters, setXpFloaters] = useState<Record<string, number>>({})
   const taskCompletionAwardedRef = useRef(false)
   const playSound = useSoundFX()
 
@@ -308,23 +324,12 @@ export default function TaskSteps() {
         return
       }
 
-      // Replace the current step with the new subtasks inline
-      const subtasks: Step[] = data.steps.map((s, i) => ({
-        id: Date.now() + i,
-        text: s.text,
-        duration: s.duration,
-        completed: false,
-        startedAt: null,
-      }))
-
       setSteps((prev) => {
         const idx = prev.findIndex((s) => s.id === step.id)
         if (idx === -1) return prev
 
-        const parentNumber = idx + 1 // e.g. step 3 → 3
-
         const subtasks: Step[] = data.steps.map((s, i) => ({
-          id: parseFloat(`${parentNumber}.${i + 1}`), // 3.1, 3.2, 3.3
+          id: `${step.id}.${i + 1}`,
           text: s.text,
           duration: s.duration,
           completed: false,
@@ -345,7 +350,7 @@ export default function TaskSteps() {
   }, [])
 
   const handleTap = useCallback(
-    (id: number) => {
+    (id: string) => {
       const stepIndex = steps.findIndex((s) => s.id === id)
       const step = steps[stepIndex]
       if (!step) return
@@ -511,6 +516,7 @@ export default function TaskSteps() {
                 ].join(" ")}
               >
                 <XPFloater
+                  stepId={step.id}
                   amount={xpFloaters[step.id] ?? null}
                   onDone={() =>
                     setXpFloaters((prev) => {
@@ -523,14 +529,14 @@ export default function TaskSteps() {
                 />
                 <div className={[
                   "min-w-[2rem] h-8 px-2 rounded-full flex items-center justify-center font-bold flex-shrink-0 transition-all duration-300",
-                  Number.isInteger(step.id) ? "w-8 text-sm" : "text-[11px] tracking-tight",
+                  isTopLevelStepId(step.id) ? "w-8 text-sm" : "text-[11px] tracking-tight",
                   isCompleted
                     ? "bg-linear-to-br from-emerald-400 to-green-500 text-white shadow-md shadow-emerald-200"
                     : isActive
                       ? "bg-linear-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-200"
                       : "bg-blue-100 text-blue-600",
                 ].join(" ")}>
-                  {isCompleted ? "✓" : Number.isInteger(step.id) ? step.id : step.id.toFixed(1)}
+                  {isCompleted ? "✓" : formatStepLabel(step.id)}
                 </div>
 
                 <div className="flex-1 flex flex-col gap-0.5 min-w-0">

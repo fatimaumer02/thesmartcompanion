@@ -3,20 +3,21 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 
 type Props = {
+  stepId: string
   amount: number | null
   onDone: () => void
 }
 
 // "+10 XP" that floats up and fades. Anchored over the step that was just
 // completed.
-export default function XPFloater({ amount, onDone }: Props) {
+export default function XPFloater({ stepId, amount, onDone }: Props) {
   const reduce = useReducedMotion()
 
   return (
     <AnimatePresence onExitComplete={onDone}>
       {amount !== null && (
         <motion.div
-          key={amount}
+          key={stepId}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.9 }}
           animate={reduce ? { opacity: 1 } : { opacity: 1, y: -28, scale: 1 }}
           exit={{ opacity: 0, y: -42 }}

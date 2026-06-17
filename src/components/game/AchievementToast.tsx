@@ -1,7 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Achievement } from "../../lib/gamification"
 
 type QueueItem = Achievement & { key: number }
@@ -15,10 +15,14 @@ type Props = {
 export default function AchievementToast({ achievements }: Props) {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const reduce = useReducedMotion()
+  const nextKeyRef = useRef(0)
 
   useEffect(() => {
     if (achievements.length === 0) return
-    const stamped = achievements.map((a, i) => ({ ...a, key: Date.now() + i }))
+    const stamped = achievements.map((a) => ({
+      ...a,
+      key: ++nextKeyRef.current,
+    }))
     setQueue((q) => [...q, ...stamped])
   }, [achievements])
 

@@ -53,7 +53,7 @@ export default function MotivationalMessage({ progressPct, className }: Props) {
     <div className={["relative h-5 overflow-hidden", className ?? ""].join(" ")}>
       <AnimatePresence mode="popLayout">
         <motion.span
-          key={message}
+          key={index}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
           animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
