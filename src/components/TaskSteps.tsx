@@ -100,6 +100,16 @@ function formatStepLabel(id: string): string {
   return id
 }
 
+type TaskSession = { title: string; steps: Step[]; taskId?: number }
+
+function TaskStepsLoading() {
+  return (
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-center justify-center py-8 px-4">
+      <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
@@ -120,15 +130,21 @@ function Modal({ children }: { children: React.ReactNode }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TaskSteps() {
   const router = useRouter()
-  const session = loadFromSession()
+  const [session, setSession] = useState<TaskSession | null>(null)
+  const [steps, setSteps] = useState<Step[]>([])
 
   useEffect(() => {
-    if (!session) router.replace("/mytask")
-  }, [])
+    const loaded = loadFromSession()
+    if (!loaded) {
+      router.replace("/mytask")
+      return
+    }
+    setSession(loaded)
+    setSteps(loaded.steps)
+  }, [router])
 
   const title = session?.title ?? ""
   const taskId = session?.taskId
-  const [steps, setSteps] = useState<Step[]>(session?.steps ?? [])
 
   const [activeStep, setActiveStep] = useState<string | null>(null)
   const [firstCompletedAt, setFirstCompletedAt] = useState<number | null>(null)
@@ -156,7 +172,7 @@ export default function TaskSteps() {
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const completedCount = steps.filter((s) => s.completed).length
-  const progressPct = Math.round((completedCount / steps.length) * 100)
+  const progressPct = steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0
 
   useEffect(() => {
     if (progressPct !== 100) {
@@ -415,7 +431,7 @@ export default function TaskSteps() {
 
   const canViewProgress = completedCount > 0 || activeStep !== null
 
-  if (!session) return null
+  if (!session) return <TaskStepsLoading />
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-sky-100 flex items-start justify-center py-8 px-4 sm:px-6 lg:px-8">
