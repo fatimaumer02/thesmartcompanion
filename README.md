@@ -1,36 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## 🧠 Smart Companion
 
-## Getting Started
+An AI-powered productivity assistant built for neurodivergent minds. Break overwhelming tasks into tiny **Micro-Wins** one step at a time.
 
-First, run the development server:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+ <img width="1347" height="553" alt="image" src="https://github.com/user-attachments/assets/ffe2d103-21be-44ce-b144-873238febce1" />
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🌟 Overview
+Smart Companion is an intelligent productivity assistant designed to help neurodivergent individuals stay focused, organized, and motivated. Instead of presenting large, intimidating tasks, the app breaks them down into manageable **Micro-Wins**, making progress feel achievable and rewarding.
+Whether you're dealing with ADHD, executive dysfunction, procrastination, or task overwhelm, Smart Companion provides gentle guidance and actionable next steps to keep you moving forward.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Screenshots
