@@ -66,6 +66,25 @@ function initials(name: string): string {
   return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()
 }
 
+// ── FIX: normalized, defensive matching between a task and a user ──────────
+// Previously this used a strict `===` comparison on user_id / user_email.
+// That silently fails (and returns 0 tasks for everyone) if:
+//   - emails differ only in casing or whitespace ("John@Gmail.com" vs "john@gmail.com")
+//   - user_id is stored as a different type/format on one side (e.g. a UUID
+//     object vs string, or extra whitespace from a copy/paste)
+// Trimming + lowercasing both sides before comparing fixes that class of bug.
+function tasksMatchUser(task: SupabaseTask, user: SupabaseUser): boolean {
+  const taskUserId = task.user_id ? String(task.user_id).trim() : ""
+  const userId = user.id ? String(user.id).trim() : ""
+  const sameId = Boolean(taskUserId && userId && taskUserId === userId)
+
+  const taskEmail = task.user_email ? task.user_email.trim().toLowerCase() : ""
+  const userEmail = user.email ? user.email.trim().toLowerCase() : ""
+  const sameEmail = Boolean(taskEmail && userEmail && taskEmail === userEmail)
+
+  return sameId || sameEmail
+}
+
 export default function TasksPage() {
   const [users, setUsers]                   = useState<SupabaseUser[]>([])
   const [tasks, setTasks]                   = useState<SupabaseTask[]>([])
@@ -83,6 +102,17 @@ export default function TasksPage() {
         supabase.from("tasks").select("*").order("created_timestamp", { ascending: false }),
       ])
       if (cancelled) return
+
+      // ── DEBUG: leave this in temporarily if tasks still don't show up.
+      // If tasksRes.data comes back shorter than what you see in the
+      // Supabase table editor (or empty), the issue is RLS, not this file.
+      // Check Authentication > Policies on the "tasks" table — if RLS is
+      // enabled with a policy like `auth.uid() = user_id`, an admin client
+      // using the anon key will get back zero rows with NO error, for any
+      // task that doesn't belong to the currently authenticated user.
+      console.log("[tasks admin] usersRes:", usersRes)
+      console.log("[tasks admin] tasksRes:", tasksRes)
+
       if (usersRes.error) setError(usersRes.error.message)
       else if (usersRes.data) setUsers(usersRes.data as SupabaseUser[])
       if (tasksRes.error) setError((p) => p ? `${p} | ${tasksRes.error!.message}` : tasksRes.error!.message)
@@ -93,14 +123,10 @@ export default function TasksPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Match by both user_id AND user_email
+  // ── FIX: use the normalized matcher instead of strict equality ─────────
   const getTasksForUser = useMemo(() => {
     return (user: SupabaseUser): SupabaseTask[] =>
-      tasks.filter(
-        (t) =>
-          (t.user_id && t.user_id === user.id) ||
-          (t.user_email && t.user_email === user.email)
-      )
+      tasks.filter((t) => tasksMatchUser(t, user))
   }, [tasks])
 
   useEffect(() => {
@@ -216,7 +242,6 @@ function UserDetailModal({ user, tasks, onClose }: { user: SupabaseUser; tasks: 
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null)
   const [reminderState, setReminderState]   = useState<Record<number, "idle" | "sending" | "sent" | "error">>({})
 
-  // ── FIXED: calls sendReminder which POSTs to /api/admin/remind ─────────────
   const handleRemind = async (task: SupabaseTask) => {
     if (!task.user_id) {
       console.warn("Task has no user_id — cannot send reminder")
@@ -320,7 +345,6 @@ function UserDetailModal({ user, tasks, onClose }: { user: SupabaseUser; tasks: 
                                 {status}
                               </span>
 
-                              {/* ── Remind button — now actually works ── */}
                               {status !== "Completed" && (
                                 <button
                                   type="button"

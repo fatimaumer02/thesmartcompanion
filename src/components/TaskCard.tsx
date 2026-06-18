@@ -2,13 +2,16 @@
 
 import { useRouter } from "next/navigation"
 import { motion, useReducedMotion } from "framer-motion"
+import { useState } from "react"
 import TiltCard from "./TiltCard"
+import { deleteTask } from "../lib/task"
 
 type Props = {
   title: string
   progress: string
   index?: number
   taskId?: number
+  onDelete?: (taskId: number) => void
 }
 
 type ColorConfig = {
@@ -75,10 +78,12 @@ const COLORS: ColorConfig[] = [
   },
 ]
 
-export default function TaskCard({ title, progress, index = 0, taskId }: Props) {
+export default function TaskCard({ title, progress, index = 0, taskId, onDelete }: Props) {
   const router = useRouter()
   const color = COLORS[index % COLORS.length]
   const reduce = useReducedMotion()
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const [done, total] = progress.split("/").map(Number)
   const pct = Math.round((done / total) * 100)
@@ -104,6 +109,22 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
     router.push("/taskinfo")
   }
 
+  const handleDelete = async () => {
+    if (!taskId) return
+
+    if (!confirmDelete) {
+      setConfirmDelete(true) // first click: ask for confirmation
+      return
+    }
+
+    // second click: actually delete
+    setDeleting(true)
+    await deleteTask(taskId)
+    onDelete?.(taskId)
+    setDeleting(false)
+    setConfirmDelete(false)
+  }
+
   const status =
     pct === 100 ? "Cleared" : pct >= 50 ? "In Progress" : done > 0 ? "Started" : "Ready"
 
@@ -125,7 +146,8 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
         />
         <div className="relative bg-white/85 rounded-2xl overflow-hidden">
           <div className="p-4 sm:p-5 flex flex-col gap-3">
-            {/* Top row: icon + category + status */}
+
+            {/* Top row: icon + category + status + delete */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
@@ -139,17 +161,45 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
                   {color.label}
                 </span>
               </div>
-              <span
-                className={[
-                  "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
-                  pct === 100
-                    ? "bg-emerald-100 text-emerald-600"
-                    : "bg-slate-100 text-slate-500",
-                ].join(" ")}
-              >
-                {status}
-              </span>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={[
+                    "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
+                    pct === 100
+                      ? "bg-emerald-100 text-emerald-600"
+                      : "bg-slate-100 text-slate-500",
+                  ].join(" ")}
+                >
+                  {status}
+                </span>
+
+                {/* Delete button */}
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className={[
+                    "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider transition-all duration-200",
+                    confirmDelete
+                      ? "bg-rose-500 text-white animate-pulse"
+                      : "bg-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white",
+                    deleting ? "opacity-50 cursor-not-allowed" : "",
+                  ].join(" ")}
+                >
+                  {deleting ? "..." : confirmDelete ? "Sure?" : "✕"}
+                </button>
+              </div>
             </div>
+
+            {/* Cancel confirm hint */}
+            {confirmDelete && (
+              <p
+                onClick={() => setConfirmDelete(false)}
+                className="text-[10px] text-slate-400 cursor-pointer hover:text-rose-400 transition-colors -mt-1"
+              >
+                Tap ✕ again to confirm delete · tap here to cancel
+              </p>
+            )}
 
             {/* Title */}
             <p className="text-[14px] font-semibold text-slate-800 leading-snug line-clamp-2">
@@ -212,6 +262,7 @@ export default function TaskCard({ title, progress, index = 0, taskId }: Props) 
                 />
               </svg>
             </button>
+
           </div>
         </div>
       </motion.div>

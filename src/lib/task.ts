@@ -69,11 +69,10 @@ export async function saveTask(
   tasks.push(newTask)
   localStorage.setItem("userTasks", JSON.stringify(tasks))
 
-  // 2. Save to Supabase — get user from auth AND from localStorage profile
+  // 2. Save to Supabase
   try {
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Get email from auth user OR localStorage profile as fallback
     const profileRaw = localStorage.getItem("userProfile")
     const profile = profileRaw ? JSON.parse(profileRaw) : null
     const userEmail = user?.email || profile?.email || null
@@ -83,7 +82,7 @@ export async function saveTask(
       const { error } = await supabase.from("tasks").insert({
         id:                newTask.id,
         user_id:           userId,
-        user_email:        userEmail,   // ← always save email
+        user_email:        userEmail,
         title:             newTask.title,
         progress:          newTask.progress,
         created_at:        newTask.createdAt,
@@ -127,26 +126,42 @@ export async function updateTaskProgress(
   }
 }
 
+// ── Delete task — localStorage + Supabase ─────────────────────────────────────
+export async function deleteTask(taskId: number): Promise<void> {
+  // 1. Remove from localStorage
+  const tasks = readTasks()
+  const updated = tasks.filter((t) => t.id !== taskId)
+  localStorage.setItem("userTasks", JSON.stringify(updated))
+
+  // 2. Remove from Supabase
+  try {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId)
+    if (error) console.error("Supabase delete error:", error)
+  } catch (e) {
+    console.error("Delete error:", e)
+  }
+}
+
 // ── Sync from Supabase → localStorage (call after login) ─────────────────────
 export async function syncTasksFromSupabase(): Promise<void> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Get email from auth OR localStorage profile
     const profileRaw = localStorage.getItem("userProfile")
     const profile = profileRaw ? JSON.parse(profileRaw) : null
     const userEmail = user?.email || profile?.email || null
 
     if (!userEmail) return
 
-    // ── Fetch by user_id if available, else by user_email ──
     let query = supabase
       .from("tasks")
       .select("*")
       .order("created_timestamp", { ascending: false })
 
     if (user?.id) {
-      // Try by user_id first
       const { data: byId, error: idError } = await query.eq("user_id", user.id)
       if (!idError && byId && byId.length > 0) {
         const mapped: Task[] = byId.map((row) => ({

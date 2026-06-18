@@ -53,7 +53,6 @@ export default function MyTasksPage() {
   useEffect(() => {
     const allTasks = readTasks()
 
-    // ── Smart fix: use id timestamp to get real creation date ──
     const fixed = allTasks.map((t) => ({
       ...t,
       createdAt: t.createdAt || new Date(t.id).toDateString(),
@@ -67,6 +66,11 @@ export default function MyTasksPage() {
 
     setTasks(fixed)
   }, [])
+
+  // ── Delete handler ────────────────────────────────────────────────────────
+  const handleDelete = (taskId: number) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+  }
 
   const { overallPct, completed, inProgress } = getStats(tasks)
 
@@ -135,6 +139,7 @@ export default function MyTasksPage() {
       setError(e instanceof Error ? e.message : "Network error")
     } finally {
       setGenerating(false)
+      setNewTask("")
     }
   }
 
@@ -272,6 +277,7 @@ export default function MyTasksPage() {
                     progress={task.progress}
                     index={i}
                     taskId={task.id}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>
@@ -316,6 +322,7 @@ export default function MyTasksPage() {
                             progress={task.progress}
                             index={i}
                             taskId={task.id}
+                            onDelete={handleDelete}
                           />
                         ))}
                       </div>
