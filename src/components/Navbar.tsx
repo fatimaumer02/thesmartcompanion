@@ -27,11 +27,13 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-0">
-              <ShieldCheck size={20} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-white font-bold text-sm truncate">Smart Companion</p>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 bg-indigo-950 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                <ShieldCheck size={18} className="text-white" />
+              </div>
+              <span className="font-semibold text-base text-gray-800 tracking-tight truncate">
+                Smart Companion
+              </span>
             </div>
           </div>
         </Link>
@@ -44,11 +46,10 @@ export default function Navbar() {
               <Link
                 key={href}
                 href={href}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                  active
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${active
                     ? "bg-blue-50 text-blue-700"
                     : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 {label}
               </Link>
@@ -88,11 +89,10 @@ export default function Navbar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                    active
+                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active
                       ? "bg-blue-50 text-blue-700"
                       : "text-gray-600 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   {label}
                 </Link>

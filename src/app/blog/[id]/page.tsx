@@ -1,5 +1,5 @@
 "use client"
-
+import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { supabase } from "../../../lib/supabase"
@@ -84,10 +84,14 @@ export default function BlogDetailPage() {
             onClick={() => router.push("/")}
             className="flex items-center gap-2"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-              SC
+            <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-indigo-950 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+              <ShieldCheck size={18} className="text-white" />
             </div>
-            <span className="font-bold text-slate-800 text-sm">Smart Companion</span>
+            <span className="font-semibold text-base text-gray-800 tracking-tight truncate">
+              Smart Companion
+            </span>
+          </div>
           </button>
 
          
