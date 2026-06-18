@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  ShieldCheck,
 } from "lucide-react"
 import NotificationBell from "./NotificationBell"
 
@@ -91,8 +92,8 @@ export default function Sidebar() {
         {/* Logo + bell + close button */}
         <div className="flex items-center justify-between mb-10 px-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-              <span className="text-white font-bold text-sm">SC</span>
+            <div className="w-9 h-9 bg-indigo-950 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+              <ShieldCheck size={18} className="text-white" />
             </div>
             <span className="font-semibold text-base text-gray-800 tracking-tight truncate">
               Smart Companion
