@@ -4,7 +4,7 @@
 
 An AI-powered productivity assistant built for neurodivergent minds. Break overwhelming tasks into tiny **Micro-Wins** one step at a time.
 
-![Smart Companion hero banner — bridging the executive function gap with neuro-inclusive AI](docs/screenshots/hero-banner.png)
+![Smart Companion hero banner — project overview for neuro-inclusive AI task support](docs/screenshots/hero-banner.png)
 
 ---
 
@@ -14,7 +14,7 @@ Smart Companion is an intelligent productivity assistant designed to help neurod
 
 Whether you're dealing with ADHD, executive dysfunction, procrastination, or task overwhelm, Smart Companion provides gentle guidance and actionable next steps to keep you moving forward.
 
-Built with **Next.js 16**, **React 19**, **Supabase**, and multiple AI providers (OpenAI, Anthropic, Google Generative AI), with voice capture powered by **Vapi AI**.
+Built with **Next.js 16**, **React 19**, **TypeScript**, **Tailwind CSS**, **Supabase** (auth + database), **Groq/OpenAI** for AI step generation, **Three.js** for ambient visuals, and **Vapi AI** for voice input.
 
 ---
 
@@ -34,137 +34,143 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📸 Screenshots
 
-The images below follow the natural user journey — from discovering the product on the marketing site, through sign-up and daily use, to the admin experience.
+The images below follow the user journey — marketing site → login → onboarding → daily use → admin panel. Each caption reflects what the code in `src/` actually implements.
 
 ---
 
 ### 1. Public Marketing Site
 
-#### Landing Page
+#### Hero Banner
+
+![Smart Companion hero banner — bridging the executive function gap with neuro-inclusive AI](docs/screenshots/hero-banner.png)
+
+Project branding graphic summarizing the four pillars the app is built around: breaking overwhelming tasks into micro-steps, supporting time blindness, dyslexia-friendly reading, and reducing decision fatigue — for ADHD, autism, and dyslexia.
+
+#### Landing Page (`/`)
 
 ![Smart Companion landing page — Your AI Companion for Everyday Wins](docs/screenshots/landing-page.png)
 
-The home page introduces the value proposition and the four challenges the app addresses: **task paralysis**, **time blindness**, **reading difficulty**, and **decision fatigue**. This is the first touchpoint for new visitors.
+The root route renders `Navbar`, `Hero`, and `Features`. The hero (`Hero.tsx`) shows the tagline *"Your AI Companion for Everyday Wins"*, a **Get Started** link to `/login`, and a Three.js `HeroScene`. Below it, the **Challenges We Help With** grid (`Features.tsx`) lists Task Paralysis, Time Blindness, Reading Difficulty, and Decision Fatigue.
 
-#### Features Page
+#### Features Page (`/features`)
 
 ![Smart Companion features page — micro-steps, voice capture, focus mode, and more](docs/screenshots/features-page.png)
 
-A deep dive into the six core features: Smart Task Breakdown, Voice-First Capture, Time-Aware Reminders, Focus Mode, Reading Accommodations, and Win Celebrations. The comparison table at the bottom shows how Smart Companion differs from generic productivity apps.
+Dedicated features route with six cards defined in `features/page.tsx`: Smart Task Breakdown, Voice-First Capture, Time-Aware Reminders, Focus Mode, Reading Accommodations, and Win Celebrations. Includes a **How SmartCompanion compares** table and a CTA linking to `/login`.
 
-#### About Page
+#### About Page (`/about`)
 
 ![Smart Companion about page — mission, impact stats, and core values](docs/screenshots/about-page.png)
 
-The story behind the product: *"We're building the tool we wished existed."* Highlights the mission ("Make starting easier than scrolling"), impact metrics, and guiding principles like *Built with, not for* and *Your data is yours*.
+Static about page with the founder story (*"We're building the tool we wished existed"*), mission statement (*"Make starting easier than scrolling"*), stats (12k+ signups, 84% fewer freeze moments, 4.8★ rating), and four values: Built with not for, Soft by default, Your data is yours, and Evidence over hype.
 
-#### Blog
+#### Blog (`/blog`)
 
 ![Smart Companion blog — Notes from a calmer productivity](docs/screenshots/blog-page.png)
 
-A content hub with research, design notes, and user stories. Articles cover topics like removing streaks for ADHD-friendly design, task paralysis research, dyslexia-friendly typography, and the engineering behind a kind AI assistant.
+Blog page that merges **published posts from Supabase** (`blogs` table) with static seed articles. Category filters (All, Product, Research, Design, Stories, Engineering), a featured post on removing streaks, and a newsletter signup footer.
 
 ---
 
-### 2. Authentication
+### 2. Authentication (`/login`)
 
 #### User Login
 
 ![Smart Companion user login page](docs/screenshots/user-login.png)
 
-The user entry point with email/password login, Google OAuth, and links to sign up or recover a password. The split-screen layout reinforces brand identity on the left while keeping the form clean on the right.
+Single login page with a **User Login / Admin Login** toggle. User mode uses **Supabase** email/password auth and **Google OAuth**. On success it syncs tasks, stores the profile in `localStorage`, and routes to `/profilesetup` (new users) or `/dashboard` (returning users). Includes forgot-password flow via Supabase reset email.
 
 #### Admin Login
 
 ![Smart Companion admin login page](docs/screenshots/admin-login.png)
 
-A separate admin authentication flow with dedicated credentials, keeping administrative access isolated from regular user accounts.
+Same `/login` page in **Admin Login** mode. Validates against hardcoded admin credentials and redirects to `/admin/overview`. Google OAuth and sign-up links are hidden in this mode.
 
 ---
 
-### 3. Onboarding
+### 3. Onboarding (`/profilesetup`)
 
 #### Neuro-Profile Setup
 
 ![Smart Companion neuro-profile personalization — neurotype, step size, and reading style](docs/screenshots/neuro-profile-setup.png)
 
-After sign-up, users personalize their experience in three quick steps: selecting a **neurotype** (ADHD, Dyslexia, Autism, Other), choosing a **step size** (Very Small, Normal, Detailed), and picking a **reading font** (Default, OpenDyslexic, Lexend). The AI uses these preferences to tailor every task breakdown.
+First-time setup after sign-up. Users pick a **neurotype** (ADHD, Dyslexia, Autism, Other), **step size** (Very Small → 8–9 micro-steps, Normal → 4–6, Detailed → up to 10), and a **reading font** (Default, OpenDyslexic, Lexend). Choices are saved to `localStorage` as `preferences` (including a `stepSizeInstruction` for the AI) and `profile_completed: true` is written to Supabase before redirecting to `/dashboard`.
 
 ---
 
 ### 4. User Dashboard & Task Management
 
-#### Dashboard
+#### Dashboard (`/dashboard`)
 
 ![Smart Companion dashboard — break tasks into steps and track daily progress](docs/screenshots/dashboard.png)
 
-The home screen after login. Users enter a goal ("Clean my room, Study math…"), hit **Break into Steps**, and see today's progress at a glance. Active quests appear below with step-level progress bars and a **Continue Quest** call to action.
+Main hub wrapped in `Sidebar` + `ProgressCard`. Users type a task and click **Break into Steps**, which POSTs to `/api/generate-steps` with their neurotype and step size from preferences. The mic icon links to `/voice-assistant`. Generated tasks are saved via `saveTask()` and the user is sent to `/taskinfo` to work through steps. **Today's Tasks** lists only tasks created today, sorted with incomplete first.
 
-#### My Tasks
+#### My Tasks (`/mytask`)
 
 ![Smart Companion My Tasks page — AI step generation and quest list](docs/screenshots/my-tasks.png)
 
-The full task management view with a daily completion ring, task statistics (Total / Completed / In Progress), an AI **Generate Steps** input, and a chronological list of active and cleared quests.
+Full task archive with a step-completion ring, stats strip (Total / Completed / In Progress), and the same AI **Generate Steps** flow as the dashboard. Tasks are grouped into **Today** and **Previous** sections (by `createdAt` date). Each `TaskCard` shows category badges (Personal, Study, Work, Health), segmented step progress, and delete support.
 
-#### Task History
+#### Task History (modal on Dashboard)
 
 ![Smart Companion task history modal — daily progress across all tasks](docs/screenshots/task-history.png)
 
-A modal showing historical daily completion rates. Users can review past productivity (e.g., "67% — 2 of 3 tasks completed") to build awareness without shame-based streak pressure.
+Opened via **History →** on the `ProgressCard` component. Groups all tasks by day and shows how many were fully completed that day (e.g. *2 of 3 tasks completed — 67%*). Today's bar reflects the same logic as the progress card on the dashboard.
 
 ---
 
-### 5. Gamification & Motivation
+### 5. Gamification (`/rewards`)
 
 #### Rewards
 
 ![Smart Companion rewards page — badges, XP, and streak tracking](docs/screenshots/rewards-page.png)
 
-Gamification that celebrates effort: tasks completed, day streaks, unlockable badges (First Win, Focus Master, Week Warrior, etc.), and an XP log showing points earned per completed quest.
+Tracks **Tasks Completed**, **Day Streak** (consecutive days with task activity), and badges earned out of six: First Win, 3-Day Streak, Focus Master (10 tasks), Step Hero (50 steps), Week Warrior (7-day streak), and Centurion (100 steps). **Recent Activity** logs completed tasks with XP (+5 per step in the task).
 
 ---
 
 ### 6. Accessibility & Support
 
-#### Voice Assistant
+#### Voice Assistant (`/voice-assistant`)
 
 ![Smart Companion voice assistant page](docs/screenshots/voice-assistant.png)
 
-Hands-free task capture powered by Vapi AI. Users can speak their goals instead of typing — ideal for moments when writing feels like too much friction.
+Uses the **Vapi AI** hook (`useVapi`) for live speech-to-text with a pulsing mic UI. Spoken or typed tasks are sent to `/api/generate-steps` and the user is redirected to `/taskinfo` — the same pipeline as the dashboard, just voice-first.
 
-#### Settings
+#### Settings (`/setting`)
 
 ![Smart Companion settings — appearance, preferences, and notifications](docs/screenshots/settings-page.png)
 
-Full personalization controls: font style, light/dark/auto theme, high contrast, reduced animations, haptic feedback, sound effects, and notification toggles (email, push, SMS).
+Persists to Supabase `user_settings` on **Save Changes**. Controls: font (OpenDyslexic, Inter, Roboto Mono, Lexend, System Default), theme (Light / Dark / Auto), high contrast, reduce animations, haptic feedback, sound effects (via `gamification.ts`), and notification toggles for email, push, and SMS.
 
-#### Help & Support
+#### Help (`/help`)
 
 ![Smart Companion help page — knowledge base and contact support](docs/screenshots/help-page.png)
 
-Self-service help with searchable articles covering task creation, AI breakdown, customization, privacy, and voice commands — plus a direct **Contact Support** option.
+Searchable FAQ accordion with five topics from `help/page.tsx`: creating tasks, how AI breakdown works, customizing your experience, privacy, and voice commands. Includes a **Contact Support** banner at the bottom.
 
 ---
 
-### 7. Admin Panel
+### 7. Admin Panel (`/admin`)
 
-#### Overview
+#### Overview (`/admin/overview`)
 
 ![Smart Companion admin overview — user and task metrics](docs/screenshots/admin-overview.png)
 
-The admin dashboard showing total users, active tasks, active/inactive user counts, and a recent users table for at-a-glance platform health.
+Admin landing page fetching data via `supabaseAdmin`. Shows four stat cards — Total Users, Active Tasks (count from `tasks` table), Active Users, Inactive Users — plus a **Recent Users** table (latest 5 from the `users` table with name, email, join date, and status).
 
-#### Users Management
+#### Users (`/admin/users`)
 
 ![Smart Companion admin users page — search, status, and delete actions](docs/screenshots/admin-users.png)
 
-Administrators can search all registered users, view join dates and status, and remove accounts when needed.
+Searchable user table. Admins can **toggle Active/Inactive** status (click the status badge) or **delete** a user (trash icon). Data is loaded from Supabase `users`.
 
-#### Tasks by User
+#### Tasks by User (`/admin/tasks`)
 
 ![Smart Companion admin tasks page — per-user task breakdown](docs/screenshots/admin-tasks-by-user.png)
 
-A grid of user cards showing each person's total, completed, and active task counts. Clicking a user reveals their full task history for monitoring and support.
+Grid of user cards with Total / Done / Active task counts pulled from Supabase `tasks`. Clicking a user opens a modal with tasks grouped by day, step-level progress, expandable step lists, and a **Remind** button that calls `sendReminder()` for incomplete tasks.
 
 ---
 
@@ -178,6 +184,7 @@ src/
 │   ├── profilesetup/         # Neuro-profile onboarding
 │   ├── dashboard/            # User home
 │   ├── mytask/               # Task list & AI breakdown
+│   ├── taskinfo/             # Step-by-step task execution
 │   ├── rewards/              # Gamification
 │   ├── voice-assistant/      # Voice capture
 │   ├── setting/              # User preferences
