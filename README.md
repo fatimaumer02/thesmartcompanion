@@ -32,10 +32,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## About
-
-🖇️ https://thesmartcompanion-gcrd.vercel.app/
-
 ## 📸 Screenshots
 
 The images below follow the user journey — marketing site → login → onboarding → daily use → admin panel. Each caption reflects what the code in `src/` actually implements.
